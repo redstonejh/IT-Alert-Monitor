@@ -26,8 +26,7 @@ RANGE_PRESETS = [
     {"days": 90, "label": "Last 90 days", "short": "90d"},
     {"days": 180, "label": "Last 6 months", "short": "6mo"},
     {"days": 365, "label": "Last year", "short": "1yr"},
-    {"days": 730, "label": "Last 2 years", "short": "2yr"},
-    {"days": 1825, "label": "Last 5 years", "short": "5yr"},
+    
 ]
 METRIC_LABELS = {
     "": "Alerts",

@@ -199,6 +199,12 @@ final score = taxonomy base score
             - successful containment discount
 ```
 
+## TODO
+
+- Align the settings page command bar and card spacing exactly with the dashboard layout.
+- Ensure the Configure page header, button placement, and card spacing match the Dashboard experience.
+- Confirm unsaved settings warnings behave consistently before navigating away.
+
 Scores are clamped from `0` to `100`, then mapped to severity buckets:
 
 - Critical

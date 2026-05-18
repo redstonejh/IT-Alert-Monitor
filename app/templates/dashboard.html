@@ -9,8 +9,7 @@
 
 <header class="db-topbar">
   <div class="db-brand">
-    <span class="db-brand-label">ESET Alert Monitor</span>
-    <h1 class="db-title">Security Dashboard</h1>
+    <h1 class="db-title">ESET Alert Monitor</h1>
   </div>
   <div class="db-pill connected">
     <span class="db-dot"></span>
@@ -41,9 +40,9 @@
     {% endif %}
   </div>
   <div class="cmd-bar-right">
-    <a class="cmd-btn cmd-btn-ghost" href="/settings">Configure</a>
+    <a class="cmd-btn" href="/settings">Configure</a>
     <form method="post" action="/auth/logout">
-      <button class="cmd-btn cmd-btn-ghost" type="submit">Disconnect</button>
+      <button class="cmd-btn cmd-btn-danger" type="submit">Disconnect</button>
     </form>
   </div>
 </div>
@@ -51,7 +50,9 @@
 <nav class="range-bar" aria-label="Dashboard view range">
   <div class="range-presets">
     {% for preset in range_presets %}
+      {% if preset.days not in [730, 1825] %}
       <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/dashboard?range={{ preset.days }}">{{ preset.short }}</a>
+      {% endif %}
     {% endfor %}
   </div>
   <div class="range-note">

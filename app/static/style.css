@@ -18,6 +18,9 @@
   --amber-soft: #fffbeb;
   --ok: #0f766e;
   --ok-soft: #ecfdf5;
+  --green: #10b981;
+  --green-hover: #059669;
+  --green-soft: #ecfdf5;
   --shadow-card: 0 18px 48px rgba(15, 23, 42, .10);
   --shadow-soft: 0 8px 24px rgba(15, 23, 42, .08);
   --radius-lg: 24px;
@@ -62,6 +65,10 @@ h1 {
   font-size: clamp(36px, 4.8vw, 56px);
   font-weight: 750;
   line-height: 1.02;
+}
+
+.title-blue {
+  color: var(--blue);
 }
 
 h2 {
@@ -743,13 +750,30 @@ pre {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 18px;
-  padding-bottom: 18px;
+  padding-bottom: 24px;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--line-soft);
 }
 
 .settings-hero h1 {
-  margin-bottom: 8px;
+  margin-bottom: 0;
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.1;
+}
+
+.settings-hero.db-topbar {
+  padding-bottom: 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.settings-hero.db-topbar .db-title {
+  margin-bottom: 0;
+  font-size: clamp(24px, 3vw, 36px);
+}
+
+.settings-hero + .cmd-bar .cmd-bar-left {
+  min-width: 340px;
 }
 
 .settings-actions,
@@ -764,6 +788,9 @@ pre {
 }
 
 .settings-actions-clean {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
   padding: 14px;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
@@ -777,7 +804,7 @@ pre {
 
 .settings-form {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .clean-settings-form {
@@ -1448,8 +1475,8 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 0 16px;
+  min-height: 46px;
+  padding: 0 22px;
   border: none;
   border-radius: 999px;
   background: var(--blue);
@@ -1478,6 +1505,36 @@ pre {
   background: var(--surface-soft);
 }
 
+/* Danger variant for buttons (used for Disconnect) */
+.cmd-btn-danger {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, .22);
+  transition: background .15s, box-shadow .15s, transform .06s;
+}
+.cmd-btn-danger:hover {
+  background: #b91c1c;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, .28);
+}
+.cmd-btn-danger:active {
+  transform: translateY(1px);
+}
+
+/* Success variant for buttons (used for Save) */
+.cmd-btn-success {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, .18);
+  transition: background .15s, box-shadow .15s, transform .06s;
+}
+.cmd-btn-success:hover {
+  background: var(--green-hover);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, .24);
+}
+.cmd-btn-success:active {
+  transform: translateY(1px);
+}
+
 /* View range bar */
 .range-bar {
   display: flex;
@@ -1504,8 +1561,8 @@ pre {
   align-items: center;
   justify-content: center;
   height: 28px;
-  min-width: 42px;
-  padding: 0 10px;
+  width: 72px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
