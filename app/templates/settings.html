@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="settings-hero">
+  <div>
+    <p class="product-label">Configure</p>
+    <h1>Configure alert monitor</h1>
+    <p class="hero-text">Connect the mailbox, tune ESET parsing filters, control Teams posting, and adjust the severity scoring model that drives dashboard risk.</p>
+  </div>
+  <a class="cmd-btn cmd-btn-ghost" href="/dashboard">Back to dashboard</a>
+</header>
+
+{% if request.query_params.get("saved") %}
+  <p class="sync-note">Configuration saved{% if request.query_params.get("rescored") %}; {{ request.query_params.get("rescored") }} historical alerts rescored{% endif %}.</p>
+{% endif %}
+
+<section class="settings-actions settings-actions-clean">
+  <a class="button-link" href="/auth/login">Reconnect Microsoft</a>
+  {% if config.oauth_account %}
+    <form class="inline-form" method="post" action="/auth/logout"><button class="secondary" type="submit">Disconnect</button></form>
+  {% endif %}
+</section>
+
+<form class="settings-form clean-settings-form" method="post" action="/settings">
+  <section class="form-section">
+    <div class="section-heading">
+      <h2>Microsoft Graph</h2>
+      <p>These IDs come from the Azure App Registration used for Microsoft sign-in.</p>
+    </div>
+    <div class="form-grid">
+      <label>Tenant ID<input name="tenant_id" value="{{ config.tenant_id }}"></label>
+      <label>Client ID<input name="client_id" value="{{ config.client_id }}"></label>
+      <label>Client secret<input type="password" name="client_secret" placeholder="{{ config.client_secret_masked or 'Optional for delegated sign-in' }}"></label>
+      <label>Signed-in account<input value="{{ config.oauth_account or 'Not connected' }}" readonly></label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <div class="section-heading">
+      <h2>Mailbox and filters</h2>
+      <p>Blank folder scans every folder. Subject and sender filters keep the parser focused on ESET notifications.</p>
+    </div>
+    <div class="form-grid">
+      <label>Notifications mailbox<input name="mailbox_address" value="{{ config.mailbox_address }}" placeholder="Blank uses signed-in mailbox"></label>
+      <label>Folder filter<input name="mail_folder" value="{{ config.mail_folder }}" placeholder="Blank scans every folder"></label>
+      <label>ESET sender filter<input name="eset_sender_filter" value="{{ config.eset_sender_filter }}" placeholder="report@protect.eset.com"></label>
+      <label>ESET subject filter<input name="eset_subject_filter" value="{{ config.eset_subject_filter }}" placeholder="ESET"></label>
+    </div>
+  </section>
+
+  <section class="form-section delivery-section">
+    <div class="section-heading">
+      <h2>Teams alerts</h2>
+      <p>Escalations are limited to the first Critical alert per client per rolling 24 hours.</p>
+    </div>
+    <div class="form-grid">
+      <label class="full-span">Teams webhook URL<input type="password" name="teams_webhook_url" placeholder="{{ config.teams_webhook_url_masked or 'Paste Teams Workflow / Incoming Webhook URL' }}"></label>
+      <label class="switch-row full-span">
+        <input type="checkbox" name="teams_dry_run" {% if config.teams_dry_run %}checked{% endif %}>
+        <span>
+          <strong>Local preview mode</strong>
+          <small>Keep enabled while testing. Turn off to post real escalation messages to Teams.</small>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section severity-section" id="severity-assessment">
+    <div class="section-heading">
+      <h2>Severity assessment</h2>
+      <p>Final score = taxonomy base score + context adjustments, clamped from 0 to 100. Existing alerts are rescored when you save.</p>
+    </div>
+
+    <div class="logic-card">
+      <strong>Current logic</strong>
+      <span>Critical if score >= {{ config.severity_critical_threshold }}. High if >= {{ config.severity_high_threshold }}. Medium if >= {{ config.severity_medium_threshold }}. Otherwise Low.</span>
+      <span>Only Critical alerts are eligible for Teams escalation, and Teams posting is capped to the first Critical alert per client per rolling 24 hours.</span>
+    </div>
+
+    <div class="form-grid scoring-grid">
+      <div class="score-group-title full-span">Taxonomy base scores</div>
+      <label class="full-span">Taxonomy base scores
+        <textarea name="taxonomy_scores" rows="11" spellcheck="false">{{ config.taxonomy_scores }}</textarea>
+      </label>
+
+      <div class="score-group-title full-span">Severity buckets</div>
+      <label>Unknown threat base score<input type="number" min="0" max="100" name="unknown_base_score" value="{{ config.unknown_base_score }}"></label>
+      <label>Critical threshold<input type="number" min="0" max="100" name="severity_critical_threshold" value="{{ config.severity_critical_threshold }}"></label>
+      <label>High threshold<input type="number" min="0" max="100" name="severity_high_threshold" value="{{ config.severity_high_threshold }}"></label>
+      <label>Medium threshold<input type="number" min="0" max="100" name="severity_medium_threshold" value="{{ config.severity_medium_threshold }}"></label>
+
+      <div class="score-group-title full-span">Same host, same threat repetition</div>
+      <label>Repeat window hours<input type="number" min="1" name="repeated_same_host_window_hours" value="{{ config.repeated_same_host_window_hours }}"></label>
+      <label>Repeat once adjustment<input type="number" name="repeated_same_host_1_adjustment" value="{{ config.repeated_same_host_1_adjustment }}"></label>
+      <label>Repeat twice adjustment<input type="number" name="repeated_same_host_2_adjustment" value="{{ config.repeated_same_host_2_adjustment }}"></label>
+      <label>Repeat 3+ adjustment<input type="number" name="repeated_same_host_3_adjustment" value="{{ config.repeated_same_host_3_adjustment }}"></label>
+
+      <div class="score-group-title full-span">Same threat across endpoints</div>
+      <label>Campaign window hours<input type="number" min="1" name="campaign_endpoint_window_hours" value="{{ config.campaign_endpoint_window_hours }}"></label>
+      <label>2 endpoints adjustment<input type="number" name="campaign_endpoint_2_adjustment" value="{{ config.campaign_endpoint_2_adjustment }}"></label>
+      <label>3 endpoints adjustment<input type="number" name="campaign_endpoint_3_adjustment" value="{{ config.campaign_endpoint_3_adjustment }}"></label>
+      <label>5 endpoints adjustment<input type="number" name="campaign_endpoint_5_adjustment" value="{{ config.campaign_endpoint_5_adjustment }}"></label>
+
+      <div class="score-group-title full-span">Persistence and velocity</div>
+      <label>2-day persistence adjustment<input type="number" name="persistence_2_day_adjustment" value="{{ config.persistence_2_day_adjustment }}"></label>
+      <label>4-day persistence adjustment<input type="number" name="persistence_4_day_adjustment" value="{{ config.persistence_4_day_adjustment }}"></label>
+      <label>Velocity window hours<input type="number" min="1" name="velocity_window_hours" value="{{ config.velocity_window_hours }}"></label>
+      <label>Velocity baseline days<input type="number" min="1" name="velocity_baseline_days" value="{{ config.velocity_baseline_days }}"></label>
+      <label>Velocity multiplier<input type="number" min="1" name="velocity_multiplier" value="{{ config.velocity_multiplier }}"></label>
+      <label>Velocity minimum count<input type="number" min="1" name="velocity_min_count" value="{{ config.velocity_min_count }}"></label>
+      <label>Velocity adjustment<input type="number" name="velocity_adjustment" value="{{ config.velocity_adjustment }}"></label>
+
+      <div class="score-group-title full-span">Host volume and remediation outcome</div>
+      <label>Host alert window hours<input type="number" min="1" name="host_alert_window_hours" value="{{ config.host_alert_window_hours }}"></label>
+      <label>Host alert threshold<input type="number" min="1" name="host_alert_count_threshold" value="{{ config.host_alert_count_threshold }}"></label>
+      <label>Host alert adjustment<input type="number" name="host_alert_adjustment" value="{{ config.host_alert_adjustment }}"></label>
+      <label>Failure/unresolved adjustment<input type="number" name="failure_adjustment" value="{{ config.failure_adjustment }}"></label>
+      <label>Successful containment adjustment<input type="number" name="success_adjustment" value="{{ config.success_adjustment }}"></label>
+    </div>
+  </section>
+
+  <div class="sticky-save">
+    <button type="submit">Save configuration</button>
+    <span>Auto-scan stays at 60 days, refreshes every 60 seconds, and rescoring runs after save.</span>
+  </div>
+</form>
+{% endblock %}

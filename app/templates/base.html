@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESET Alert Monitor</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260518-severity-logic">
+</head>
+<body>
+  <main class="page">
+    {% if error %}
+      <section class="notice error">{{ error }}</section>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js?v=20260518-severity-diagram"></script>
+</body>
+</html>

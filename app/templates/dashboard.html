@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block content %}
+{% if config.oauth_account %}
+<script>setTimeout(() => location.reload(), 60000);</script>
+{% endif %}
+
+{% if config.oauth_account %}
+{# ── CONNECTED DASHBOARD ─────────────────────────────────────────────── #}
+
+<header class="db-topbar">
+  <div class="db-brand">
+    <span class="db-brand-label">ESET Alert Monitor</span>
+    <h1 class="db-title">Security Dashboard</h1>
+  </div>
+  <div class="db-pill connected">
+    <span class="db-dot"></span>
+    <div>
+      <strong>Mailbox connected</strong>
+      <small>{{ config.oauth_account }}</small>
+    </div>
+  </div>
+</header>
+
+<div class="cmd-bar">
+  <div class="cmd-bar-left">
+    <span class="cmd-mailbox">{{ config.mailbox_address or config.oauth_account }}</span>
+    <span class="cmd-sep">·</span>
+    <span class="cmd-meta">Auto-sync every 60s</span>
+    <span class="cmd-sep">·</span>
+    <span class="cmd-meta">Last scan {{ stats.last_scan_display or "—" }}</span>
+    <span class="cmd-sep">·</span>
+    <span class="cmd-range-pill">{{ stats.scan_range_display }}</span>
+    {% if auto_scanned %}
+      <span class="cmd-badge">{{ auto_processed }} added</span>
+    {% elif auto_scan_failed %}
+      <span class="cmd-badge cmd-badge-warn">Backfill failed</span>
+    {% elif request.query_params.get("scanned") %}
+      <span class="cmd-badge">{{ request.query_params.get("scanned") }} new</span>
+    {% elif request.query_params.get("scan_failed") %}
+      <span class="cmd-badge cmd-badge-warn">Scan failed</span>
+    {% endif %}
+  </div>
+  <div class="cmd-bar-right">
+    <a class="cmd-btn cmd-btn-ghost" href="/settings">Configure</a>
+    <form method="post" action="/auth/logout">
+      <button class="cmd-btn cmd-btn-ghost" type="submit">Disconnect</button>
+    </form>
+  </div>
+</div>
+
+<nav class="range-bar" aria-label="Dashboard view range">
+  <div class="range-presets">
+    {% for preset in range_presets %}
+      <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/dashboard?range={{ preset.days }}">{{ preset.short }}</a>
+    {% endfor %}
+  </div>
+  <div class="range-note">
+    Viewing {{ stats.scan_range_display }}. Coverage {{ stats.coverage_start_display or "starting now" }}{% if stats.coverage_end_display %} to {{ stats.coverage_end_display }}{% endif %}.
+  </div>
+</nav>
+
+<div class="stat-band">
+  <a class="stat-card {% if not active_metric or active_metric == 'total' %}active{% endif %}" href="/dashboard?range={{ active_days }}">
+    <span class="stat-val">{{ stats.total }}</span>
+    <span class="stat-lbl">Total alerts</span>
+  </a>
+  <a class="stat-card {% if stats.critical > 0 %}stat-danger{% endif %} {% if active_metric == 'critical' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=critical">
+    <span class="stat-val">{{ stats.critical }}</span>
+    <span class="stat-lbl">Critical clients</span>
+  </a>
+  <a class="stat-card {% if stats.repeated > 0 %}stat-warn{% endif %} {% if active_metric == 'repeated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=repeated">
+    <span class="stat-val">{{ stats.repeated }}</span>
+    <span class="stat-lbl">Repeated threats</span>
+  </a>
+  <a class="stat-card {% if stats.failed > 0 %}stat-warn{% endif %} {% if active_metric == 'unresolved' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=unresolved">
+    <span class="stat-val">{{ stats.failed }}</span>
+    <span class="stat-lbl">Unresolved</span>
+  </a>
+  <a class="stat-card {% if active_metric == 'escalated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=escalated">
+    <span class="stat-val">{{ stats.teams_logged }}</span>
+    <span class="stat-lbl">24h critical escalations</span>
+  </a>
+</div>
+
+<div class="db-grid">
+
+  <div class="db-panel">
+    <div class="db-panel-hd">
+      <span class="db-panel-title">{{ metric_label }}</span>
+      <span class="db-panel-count">{{ recent_alerts | length }}</span>
+    </div>
+    <div class="db-panel-body">
+      <table class="al-table">
+        <thead>
+          <tr>
+            <th>Received (PT)</th>
+            <th>Host</th>
+            <th>Threat</th>
+            <th>
+              <span class="severity-head">
+                Severity
+                <button class="severity-help-btn" type="button" popovertarget="severity-help-popover" aria-label="Show severity scoring logic">?</button>
+              </span>
+            </th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in recent_alerts %}
+          <tr>
+            <td class="al-date"><a href="/alerts/{{ a.id }}">{{ a.received_display }}</a></td>
+            <td class="al-host">{{ a.hostname or a.computer_name or "—" }}</td>
+            <td class="al-threat">{{ a.threat_name or a.detection_name or "—" }}</td>
+            <td><span class="sev-tag sev-{{ (a.severity or 'unknown') | lower }}">{{ a.severity or "Unknown" }}</span></td>
+            <td class="al-status">{{ a.containment_status or a.resolved_status or a.action_taken or "—" }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="al-empty">No alerts parsed yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="db-panel">
+    <div class="db-panel-hd">
+      <span class="db-panel-title">Escalations</span>
+      <span class="db-panel-count">{{ teams_messages | length }}</span>
+    </div>
+    <div class="db-panel-body esc-feed">
+      {% for msg in teams_messages %}
+      <a class="esc-card" href="/alerts/{{ msg.alert_id or msg.id }}">
+        <div class="esc-hd">
+          <span class="esc-reason">{{ msg.reason_label }}</span>
+          <span class="esc-time">{{ msg.created_display }}</span>
+        </div>
+        <div class="esc-fields">
+          {% if msg.client_name %}<div class="esc-row"><span>Client</span><strong>{{ msg.client_name }}</strong></div>{% endif %}
+          {% if msg.hostname %}<div class="esc-row"><span>Host</span><strong>{{ msg.hostname }}</strong></div>{% endif %}
+          {% if msg.threat_name %}<div class="esc-row"><span>Threat</span><strong>{{ msg.threat_name }}</strong></div>{% endif %}
+          {% if msg.username %}<div class="esc-row"><span>User</span><strong>{{ msg.username }}</strong></div>{% endif %}
+        </div>
+        <span class="esc-more">View details</span>
+      </a>
+      {% else %}
+      <p class="esc-empty">No escalations yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<div class="severity-popover" id="severity-help-popover" popover>
+  <div class="severity-popover-head">
+    <span>Severity model</span>
+    <strong>How severity is weighed</strong>
+  </div>
+  <div class="severity-flow" aria-label="Severity scoring flow">
+    <div class="severity-node">
+      <span>1</span>
+      <strong>Threat base score</strong>
+      <small>ESET threat keywords set the starting score. Ransomware, backdoor, credential theft, trojan, phishing, downloader, riskware, and PUA each carry different base weight.</small>
+    </div>
+    <div class="severity-arrow">+</div>
+    <div class="severity-node">
+      <span>2</span>
+      <strong>Subsequent event increases</strong>
+      <small>Repeated hits on the same host raise the score each time. Spread across endpoints, multiple days, faster velocity, and host alert volume can add more weight.</small>
+    </div>
+    <div class="severity-arrow">=</div>
+    <div class="severity-node severity-node-score">
+      <span>3</span>
+      <strong>Resolution adjustment</strong>
+      <small>Failed, unresolved, not cleaned, or action required increases severity. Cleaned, deleted, quarantined, blocked, removed, or terminated discounts the score.</small>
+    </div>
+  </div>
+  <div class="severity-equation">
+    <span>Final score</span>
+    <strong>base + repeat/spread/persistence/velocity - successful resolution discount</strong>
+  </div>
+  <div class="severity-thresholds">
+    <div><span>Critical</span><strong>{{ config.severity_critical_threshold }}+</strong></div>
+    <div><span>High</span><strong>{{ config.severity_high_threshold }}+</strong></div>
+    <div><span>Medium</span><strong>{{ config.severity_medium_threshold }}+</strong></div>
+  </div>
+  <p class="severity-note">A resolved detection can stay Low or Medium even if the threat name looks noisy. Repeated or unresolved detections climb because they indicate containment is not sticking. Only Critical alerts are eligible for Teams escalation, then Teams messages are capped to the first Critical per client per rolling 24 hours.</p>
+  <a class="severity-config-link" href="/settings#severity-assessment">Tune scoring parameters in Configure</a>
+</div>
+
+{% else %}
+{# ── SETUP / NOT CONNECTED ───────────────────────────────────────────── #}
+
+<header class="app-header">
+  <div class="title-block">
+    <p class="product-label">ESET Alert Monitor</p>
+    <h1>Alert intake portal</h1>
+    <p class="hero-text">Paste your Microsoft app IDs, choose the alert mailbox, and sign in. The scan starts automatically after Microsoft accepts the login.</p>
+  </div>
+  <div class="status-pill">
+    <span></span>
+    <div>
+      <strong>Ready for Microsoft sign-in</strong>
+      <small>OAuth only, no mailbox password</small>
+    </div>
+  </div>
+</header>
+
+<section class="portal-grid">
+  <article class="connect-card">
+    <div class="connect-intro">
+      <p class="section-kicker">Setup</p>
+      <h2>Connect the notifications mailbox</h2>
+      <p>Use the Tenant ID and Client ID from your Azure App Registration. Microsoft handles the actual account sign-in.</p>
+    </div>
+    {% if request.query_params.get("auth_error") %}
+      <p class="setup-note">Microsoft sign-in could not start: {{ request.query_params.get("auth_error") }}</p>
+    {% endif %}
+    <form class="mailbox-form" method="post" action="/settings/mailbox-login">
+      <div class="field">
+        <input id="tenant_id" name="tenant_id" value="{{ config.tenant_id }}" placeholder=" " autocomplete="off" required>
+        <label for="tenant_id">Tenant ID</label>
+      </div>
+      <div class="field">
+        <input id="client_id" name="client_id" value="{{ config.client_id }}" placeholder=" " autocomplete="off" required>
+        <label for="client_id">Client ID</label>
+      </div>
+      <div class="field wide">
+        <input id="client_secret" type="password" name="client_secret" placeholder=" " autocomplete="off">
+        <label for="client_secret">Client secret (optional)</label>
+      </div>
+      <div class="field">
+        <input id="mailbox_address" type="email" name="mailbox_address" value="{{ config.mailbox_address }}" placeholder=" ">
+        <label for="mailbox_address">Notifications mailbox</label>
+      </div>
+      <div class="field">
+        <input id="mail_folder" name="mail_folder" value="{{ '' if config.mail_folder == 'Inbox' else config.mail_folder }}" placeholder=" ">
+        <label for="mail_folder">Folder filter (optional)</label>
+      </div>
+      <div class="action-row">
+        <button type="submit">Save and sign in with Microsoft</button>
+      </div>
+    </form>
+    <div class="setup-help">
+      <div>
+        <span>Redirect URI for Azure</span>
+        <code>{{ redirect_uri }}</code>
+      </div>
+      <div>
+        <span>Folder behavior</span>
+        <strong>Blank scans every folder in the mailbox.</strong>
+      </div>
+    </div>
+  </article>
+  <aside class="summary-card">
+    <p class="section-kicker">Live summary</p>
+    <h2>{{ stats.total | default(0) }} emails parsed</h2>
+    <dl class="summary-list">
+      <div><dt>Critical clients</dt><dd>{{ stats.critical | default(0) }}</dd></div>
+      <div><dt>Repeated threats</dt><dd>{{ stats.repeated | default(0) }}</dd></div>
+      <div><dt>Failed or unresolved</dt><dd>{{ stats.failed | default(0) }}</dd></div>
+      <div><dt>24h critical escalations</dt><dd>{{ stats.teams_logged | default(0) }}</dd></div>
+    </dl>
+    <div class="scan-meta">
+      <span>Last scan</span>
+      <strong>{{ stats.last_scan_display or "Not scanned yet" }}</strong>
+    </div>
+  </aside>
+</section>
+
+{% endif %}
+{% endblock %}

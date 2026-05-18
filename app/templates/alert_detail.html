@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+{% set severity = alert.severity or "Unknown" %}
+{% set endpoint = alert.hostname or alert.computer_name or "Unknown endpoint" %}
+{% set threat = alert.threat_name or alert.detection_name or "Alert detail" %}
+
+<section class="alert-hero">
+  <div class="alert-hero-copy">
+    <span class="db-brand-label">Alert detail</span>
+    <h1>{{ threat }}</h1>
+    <p>{{ endpoint }} · {{ alert.received_time }}</p>
+  </div>
+  <a class="cmd-btn cmd-btn-ghost" href="/dashboard">Back to dashboard</a>
+</section>
+
+<section class="alert-summary-band">
+  <article>
+    <span>Severity</span>
+    <strong><span class="sev-tag sev-{{ severity | lower }}">{{ severity }}</span></strong>
+  </article>
+  <article>
+    <span>Endpoint</span>
+    <strong>{{ endpoint }}</strong>
+  </article>
+  <article>
+    <span>Action</span>
+    <strong>{{ alert.action_taken or "Not found" }}</strong>
+  </article>
+  <article>
+    <span>Status</span>
+    <strong>{{ alert.containment_status or alert.resolved_status or "Not found" }}</strong>
+  </article>
+</section>
+
+<section class="alert-detail-layout">
+  <article class="alert-panel alert-panel-main">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Detection</span>
+        <h2>Incident Summary</h2>
+      </div>
+    </div>
+    <dl class="detail-list detail-list-featured">
+      <dt>Threat</dt><dd>{{ alert.threat_name or "Not found" }}</dd>
+      <dt>Detection</dt><dd>{{ alert.detection_name or "Not found" }}</dd>
+      <dt>Subject</dt><dd>{{ alert.subject or "Not found" }}</dd>
+      <dt>Scan type</dt><dd>{{ alert.scan_type or "Not found" }}</dd>
+      <dt>Score</dt><dd>{{ alert.score if alert.score is not none else "Not scored" }}</dd>
+    </dl>
+  </article>
+
+  <article class="alert-panel escalation-panel">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Escalation</span>
+        <h2>{{ "Sent to Teams" if escalation else "Not escalated" }}</h2>
+      </div>
+    </div>
+    <dl class="detail-list">
+      <dt>Reason</dt><dd>{{ escalation.reason if escalation else "No escalation record" }}</dd>
+      <dt>Last alerted</dt><dd>{{ escalation.last_alerted_at if escalation else "Never" }}</dd>
+      <dt>Fingerprint</dt><dd>{{ escalation.fingerprint if escalation else "None" }}</dd>
+    </dl>
+  </article>
+
+  <article class="alert-panel">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Endpoint</span>
+        <h2>Affected Device</h2>
+      </div>
+    </div>
+    <dl class="detail-list">
+      <dt>Client</dt><dd>{{ alert.client_name or "Not found" }}</dd>
+      <dt>Hostname</dt><dd>{{ alert.hostname or "Not found" }}</dd>
+      <dt>Computer</dt><dd>{{ alert.computer_name or "Not found" }}</dd>
+      <dt>User</dt><dd>{{ alert.username or "Not found" }}</dd>
+      <dt>IP address</dt><dd>{{ alert.ip_address or "Not found" }}</dd>
+      <dt>Operating system</dt><dd>{{ alert.operating_system or "Not found" }}</dd>
+    </dl>
+  </article>
+
+  <article class="alert-panel">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">History</span>
+        <h2>Historical Matches</h2>
+      </div>
+      <span class="db-panel-count">{{ matches | length }}</span>
+    </div>
+    <div class="alert-table-wrap">
+      <table class="compact-table">
+        <thead>
+          <tr><th>Received</th><th>Host</th><th>Threat</th><th>Severity</th></tr>
+        </thead>
+        <tbody>
+          {% for match in matches %}
+            <tr>
+              <td>{{ match.received_time }}</td>
+              <td>{{ match.hostname or match.computer_name or "Unknown" }}</td>
+              <td>{{ match.threat_name or match.detection_name or "Unknown" }}</td>
+              <td><span class="sev-tag sev-{{ (match.severity or 'unknown') | lower }}">{{ match.severity or "Unknown" }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="al-empty">No prior matches for this endpoint and threat.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="alert-panel raw-panel">
+  <div class="alert-panel-head">
+    <div>
+      <span class="section-kicker">Evidence</span>
+      <h2>Raw Email Body</h2>
+    </div>
+  </div>
+  <pre>{{ alert.raw_email_body }}</pre>
+</section>
+
+<section class="alert-panel metadata-panel">
+  <div class="alert-panel-head">
+    <div>
+      <span class="section-kicker">Message metadata</span>
+      <h2>Parser Fields</h2>
+    </div>
+  </div>
+  <dl class="detail-list metadata-list">
+    <dt>Alert ID</dt><dd>{{ alert.id }}</dd>
+    <dt>Message ID</dt><dd>{{ alert.message_id or "Not found" }}</dd>
+    <dt>Internet message ID</dt><dd>{{ alert.internet_message_id or "Not found" }}</dd>
+    <dt>Sender</dt><dd>{{ alert.sender or "Not found" }}</dd>
+    <dt>Created</dt><dd>{{ alert.created_at or "Not found" }}</dd>
+  </dl>
+</section>
+{% endblock %}
