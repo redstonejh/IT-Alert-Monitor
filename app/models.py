@@ -41,7 +41,7 @@ class AppConfig:
     teams_webhook_url: str = ""
     teams_dry_run: bool = True
     eset_sender_filter: str = ""
-    eset_subject_filter: str = "ESET"
+    eset_subject_filter: str = ""
     repeat_threshold: int = 3
     repeat_window_hours: int = 24
     escalation_cooldown_hours: int = 24

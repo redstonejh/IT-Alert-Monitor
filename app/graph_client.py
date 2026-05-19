@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
@@ -8,6 +9,7 @@ from app.storage import get_setting, save_setting
 
 GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
 DELEGATED_SCOPES = ["User.Read", "Mail.Read"]
+logger = logging.getLogger(__name__)
 
 
 class GraphClient:
@@ -106,31 +108,39 @@ class GraphClient:
         if not start:
             start_dt = datetime.now(timezone.utc) - timedelta(days=self.config.lookback_days)
             start = start_dt.isoformat().replace("+00:00", "Z")
+        logger.info("Graph scan: mailbox=%s auth=%s lookback_start=%s",
+                    getattr(self.config, "mailbox_address", "?"),
+                    getattr(self.config, "auth_mode", "?"),
+                    start[:19])
         filters = [f"receivedDateTime ge {self._graph_datetime(start)}"]
         select = "id,internetMessageId,receivedDateTime,subject,from,body"
         folder = self.config.mail_folder.strip()
         if folder:
             urls = [self._messages_url(folder, select, filters)]
+            logger.info("Graph scan: targeting single folder=%s", folder)
         else:
-            urls = [
-                self._messages_url(folder_id, select, filters)
-                for folder_id in self._list_mail_folder_ids()
-            ]
+            folder_ids = self._list_mail_folder_ids()
+            urls = [self._messages_url(fid, select, filters) for fid in folder_ids]
+            logger.info("Graph scan: scanning %d folders (all)", len(folder_ids))
         messages: list[dict] = []
         headers = self._headers()
         seen_message_ids: set[str] = set()
+        raw_total = 0
         for url in urls:
             while url:
                 response = requests.get(url, headers=headers, timeout=30)
                 response.raise_for_status()
                 payload = response.json()
-                for message in self._local_filter(payload.get("value", [])):
+                page = payload.get("value", [])
+                raw_total += len(page)
+                for message in self._local_filter(page):
                     message_id = message.get("id", "")
                     if message_id and message_id in seen_message_ids:
                         continue
                     seen_message_ids.add(message_id)
                     messages.append(message)
                 url = payload.get("@odata.nextLink")
+        logger.info("Graph scan: fetched %d raw messages, %d passed local filter", raw_total, len(messages))
         return messages
 
     def _messages_url(self, folder_id_or_name: str, select: str, filters: list[str]) -> str:
@@ -188,8 +198,10 @@ class GraphClient:
             )
             subject = (message.get("subject", "") or "").lower()
             if sender_filter and sender_filter not in sender:
+                logger.info("Local filter DROP sender_mismatch: sender=%s subject=%.60s", sender, subject)
                 continue
             if subject_pattern and not subject_pattern.search(subject):
+                logger.info("Local filter DROP subject_mismatch: sender=%s subject=%.60s", sender, subject)
                 continue
             matched.append(message)
         return matched
