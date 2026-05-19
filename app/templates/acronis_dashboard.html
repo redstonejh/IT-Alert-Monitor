@@ -45,9 +45,11 @@
   </div>
   <div class="app-nav-actions">
     <a class="cmd-btn" href="/acronis/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
+    {% if acronis_config.mailbox_address %}
     <form method="post" action="/auth/logout">
       <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
     </form>
+    {% endif %}
   </div>
 </header>
 

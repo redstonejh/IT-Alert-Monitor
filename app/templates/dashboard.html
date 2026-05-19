@@ -62,9 +62,11 @@
       <span class="cmd-badge cmd-badge-warn">Scan failed</span>
     {% endif %}
     <a class="cmd-btn" href="/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
+    {% if config.oauth_account %}
     <form method="post" action="/auth/logout">
       <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
     </form>
+    {% endif %}
   </div>
 </header>
 
