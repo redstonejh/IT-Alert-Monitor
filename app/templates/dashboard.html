@@ -7,30 +7,35 @@
 {% if config.oauth_account %}
 {# ── CONNECTED DASHBOARD ─────────────────────────────────────────────── #}
 
-<header class="db-topbar">
-  <div class="db-brand">
-    <h1 class="db-title">ESET Alert Monitor</h1>
-  </div>
-  <div class="db-pill connected">
-    <span class="db-dot"></span>
-    <div>
-      <strong>Mailbox connected</strong>
-      <small>{{ config.oauth_account }}</small>
+<header class="app-nav">
+  <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
+    <span class="app-logo" aria-hidden="true">E!</span>
+    <span>
+      <strong>ESET Alert Monitor</strong>
+      <small>Security operations dashboard</small>
+    </span>
+  </a>
+  <div class="app-nav-status" aria-label="Connection and sync status">
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
+      <span>
+        <strong>{{ config.mailbox_address or config.oauth_account }}</strong>
+        <small>Connected mailbox</small>
+      </span>
+    </div>
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
+      <span>
+        <strong>{% if auto_scan_failed or request.query_params.get("scan_failed") %}Sync attention{% else %}Sync healthy{% endif %}</strong>
+        <small>Last scan {{ stats.last_scan_display or "—" }}</small>
+      </span>
     </div>
   </div>
-</header>
-
-<div class="cmd-bar">
-  <div class="cmd-bar-left">
-    <span class="cmd-mailbox">{{ config.mailbox_address or config.oauth_account }}</span>
-    <span class="cmd-sep">·</span>
-    <span class="cmd-meta">Auto-sync every 60s</span>
-    <span class="cmd-sep">·</span>
-    <span class="cmd-meta">Last scan {{ stats.last_scan_display or "—" }}</span>
-    <span class="cmd-sep">·</span>
-    <span class="cmd-range-pill">{{ stats.scan_range_display }}</span>
+  <div class="app-nav-actions">
     {% if auto_scanned %}
       <span class="cmd-badge">{{ auto_processed }} added</span>
+    {% elif stats.last_parse_failed_count %}
+      <span class="cmd-badge cmd-badge-warn">{{ stats.last_parse_failed_count }} parse failed</span>
     {% elif auto_scan_failed %}
       <span class="cmd-badge cmd-badge-warn">Backfill failed</span>
     {% elif request.query_params.get("scanned") %}
@@ -38,14 +43,41 @@
     {% elif request.query_params.get("scan_failed") %}
       <span class="cmd-badge cmd-badge-warn">Scan failed</span>
     {% endif %}
-  </div>
-  <div class="cmd-bar-right">
-    <a class="cmd-btn" href="/settings">Configure</a>
+    <a class="cmd-btn" href="/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     <form method="post" action="/auth/logout">
-      <button class="cmd-btn cmd-btn-danger" type="submit">Disconnect</button>
+      <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
     </form>
   </div>
-</div>
+</header>
+
+{% if auto_scan_failed or request.query_params.get("scan_failed") %}
+<section class="connection-empty empty-state">
+  <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
+  <strong>Mailbox sync needs attention</strong>
+  <small>The last scan could not complete. Check Microsoft Graph settings, mailbox permissions, and folder filters.</small>
+  <a class="empty-action" href="/settings">Open Configure</a>
+</section>
+{% endif %}
+
+{% if stats.last_parse_failed_count %}
+<section class="parse-warning">
+  <div>
+    <strong>{{ stats.last_parse_failed_count }} email{{ "" if stats.last_parse_failed_count == 1 else "s" }} failed to parse on the last sync.</strong>
+    <small>These messages matched the mailbox filters but were missing required alert fields.</small>
+  </div>
+  {% if stats.last_parse_failed_samples %}
+    <details>
+      <summary>Show examples</summary>
+      <ul>
+        {% for item in stats.last_parse_failed_samples %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endif %}
+  <a href="/settings">Review parser filters</a>
+</section>
+{% endif %}
 
 <nav class="range-bar" aria-label="Dashboard view range">
   <div class="range-presets">
@@ -54,9 +86,6 @@
       <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/dashboard?range={{ preset.days }}">{{ preset.short }}</a>
       {% endif %}
     {% endfor %}
-  </div>
-  <div class="range-note">
-    Viewing {{ stats.scan_range_display }}. Coverage {{ stats.coverage_start_display or "starting now" }}{% if stats.coverage_end_display %} to {{ stats.coverage_end_display }}{% endif %}.
   </div>
 </nav>
 
@@ -79,7 +108,7 @@
   </a>
   <a class="stat-card {% if active_metric == 'escalated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=escalated">
     <span class="stat-val">{{ stats.teams_logged }}</span>
-    <span class="stat-lbl">24h critical escalations</span>
+    <span class="stat-lbl">Escalated cases</span>
   </a>
 </div>
 
@@ -112,11 +141,28 @@
             <td class="al-date"><a href="/alerts/{{ a.id }}">{{ a.received_display }}</a></td>
             <td class="al-host">{{ a.hostname or a.computer_name or "—" }}</td>
             <td class="al-threat">{{ a.threat_name or a.detection_name or "—" }}</td>
-            <td><span class="sev-tag sev-{{ (a.severity or 'unknown') | lower }}">{{ a.severity or "Unknown" }}</span></td>
+            <td>
+              <button
+                class="sev-tag sev-tag-button sev-{{ (a.severity or 'unknown') | lower }}"
+                type="button"
+                data-score="{{ a.score or 0 }}"
+                data-severity="{{ a.severity or 'Unknown' }}"
+                data-reasons='{{ (a.score_reasons_list or []) | tojson }}'
+              >{{ a.severity or "Unknown" }}</button>
+            </td>
             <td class="al-status">{{ a.containment_status or a.resolved_status or a.action_taken or "—" }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="al-empty">No alerts parsed yet.</td></tr>
+          <tr>
+            <td colspan="5" class="al-empty">
+              <div class="empty-state empty-state-table">
+                <span class="empty-illustration" aria-hidden="true"></span>
+                <strong>No alerts in this view</strong>
+                <small>Try a wider date range or run a mailbox scan after confirming Graph access.</small>
+                <a class="empty-action" href="/settings">Review connection</a>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -128,9 +174,10 @@
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">{{ teams_messages | length }}</span>
     </div>
-    <div class="db-panel-body esc-feed">
+    <div class="db-panel-body esc-feed esc-timeline">
       {% for msg in teams_messages %}
       <a class="esc-card" href="/alerts/{{ msg.alert_id or msg.id }}">
+        <span class="timeline-dot" aria-hidden="true"></span>
         <div class="esc-hd">
           <span class="esc-reason">{{ msg.reason_label }}</span>
           <span class="esc-time">{{ msg.created_display }}</span>
@@ -139,12 +186,18 @@
           {% if msg.client_name %}<div class="esc-row"><span>Client</span><strong>{{ msg.client_name }}</strong></div>{% endif %}
           {% if msg.hostname %}<div class="esc-row"><span>Host</span><strong>{{ msg.hostname }}</strong></div>{% endif %}
           {% if msg.threat_name %}<div class="esc-row"><span>Threat</span><strong>{{ msg.threat_name }}</strong></div>{% endif %}
-          {% if msg.username %}<div class="esc-row"><span>User</span><strong>{{ msg.username }}</strong></div>{% endif %}
+          {% if msg.domain %}<div class="esc-row"><span>Domain</span><strong>{{ msg.domain }}</strong></div>{% endif %}
+          {% if msg.user_display %}<div class="esc-row"><span>User</span><strong>{{ msg.user_display }}</strong></div>{% endif %}
         </div>
         <span class="esc-more">View details</span>
       </a>
       {% else %}
-      <p class="esc-empty">No escalations yet.</p>
+      <div class="empty-state esc-empty">
+        <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
+        <strong>No escalations in this range</strong>
+        <small>Critical cases and unresolved overrides will appear here as a chronological incident timeline.</small>
+        <a class="empty-action" href="/dashboard?range={{ active_days }}&metric=critical">View critical clients</a>
+      </div>
       {% endfor %}
     </div>
   </div>
@@ -184,9 +237,19 @@
     <div><span>High</span><strong>{{ config.severity_high_threshold }}+</strong></div>
     <div><span>Medium</span><strong>{{ config.severity_medium_threshold }}+</strong></div>
   </div>
-  <p class="severity-note">A resolved detection can stay Low or Medium even if the threat name looks noisy. Repeated or unresolved detections climb because they indicate containment is not sticking. Only Critical alerts are eligible for Teams escalation, then Teams messages are capped to the first Critical per client per rolling 24 hours.</p>
+  <p class="severity-note">ESET threat keywords set the base score by default, preserving the original severity model. Recurrence, spread, persistence, velocity, host volume, and containment outcome then adjust severity. Unresolved or failed remediation forces Critical severity and is eligible for Teams escalation, then Teams messages are capped per client during the configured cooldown.</p>
   <a class="severity-config-link" href="/settings#severity-assessment">Tune scoring parameters in Configure</a>
 </div>
+
+<dialog class="score-dialog" id="score-dialog">
+  <div class="score-dialog-head">
+    <span>Severity details</span>
+    <button type="button" class="score-dialog-close" aria-label="Close score details">x</button>
+  </div>
+  <strong id="score-dialog-title">Severity</strong>
+  <div class="score-dialog-score"><span>Score</span><b id="score-dialog-score">0</b></div>
+  <ul id="score-dialog-reasons"></ul>
+</dialog>
 
 {% else %}
 {# ── SETUP / NOT CONNECTED ───────────────────────────────────────────── #}
@@ -259,7 +322,7 @@
       <div><dt>Critical clients</dt><dd>{{ stats.critical | default(0) }}</dd></div>
       <div><dt>Repeated threats</dt><dd>{{ stats.repeated | default(0) }}</dd></div>
       <div><dt>Failed or unresolved</dt><dd>{{ stats.failed | default(0) }}</dd></div>
-      <div><dt>24h critical escalations</dt><dd>{{ stats.teams_logged | default(0) }}</dd></div>
+      <div><dt>Escalated cases</dt><dd>{{ stats.teams_logged | default(0) }}</dd></div>
     </dl>
     <div class="scan-meta">
       <span>Last scan</span>

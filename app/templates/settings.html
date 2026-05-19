@@ -1,26 +1,42 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="settings-hero db-topbar">
-  <div class="db-brand">
-    <h1 class="db-title">Configure</h1>
+<header class="app-nav settings-nav">
+  <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
+    <span class="app-logo" aria-hidden="true">E!</span>
+    <span>
+      <strong>Configure</strong>
+      <small>ESET Alert Monitor settings</small>
+    </span>
+  </a>
+  <div class="app-nav-status" aria-label="Configuration status">
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
+      <span>
+        <strong>{{ config.mailbox_address or config.oauth_account or "Mailbox not connected" }}</strong>
+        <small>Connected mailbox</small>
+      </span>
+    </div>
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
+      <span>
+        <strong>Scoring model</strong>
+        <small>Rescores historical alerts on save</small>
+      </span>
+    </div>
+  </div>
+  <div class="app-nav-actions">
+    <a class="cmd-btn" id="settings-dashboard-btn" href="/dashboard"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
+    {% if config.oauth_account %}
+      <form method="post" action="/auth/logout">
+        <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
+      </form>
+    {% endif %}
   </div>
 </header>
 
 {% if request.query_params.get("saved") %}
   <p class="sync-note">Configuration saved{% if request.query_params.get("rescored") %}; {{ request.query_params.get("rescored") }} historical alerts rescored{% endif %}.</p>
 {% endif %}
-
-<div class="cmd-bar">
-  <div class="cmd-bar-left"></div>
-  <div class="cmd-bar-right">
-    <a class="cmd-btn" id="settings-dashboard-btn" href="/dashboard">Dashboard</a>
-    {% if config.oauth_account %}
-      <form method="post" action="/auth/logout">
-        <button class="cmd-btn cmd-btn-danger" type="submit">Disconnect</button>
-      </form>
-    {% endif %}
-  </div>
-</div>
 
 <form id="settings-form" class="settings-form clean-settings-form" method="post" action="/settings">
   <section class="form-section">
@@ -29,9 +45,16 @@
       <p>These IDs come from the Azure App Registration used for Microsoft sign-in.</p>
     </div>
     <div class="form-grid">
-      <label>Tenant ID<input name="tenant_id" value="{{ config.tenant_id }}"></label>
-      <label>Client ID<input name="client_id" value="{{ config.client_id }}"></label>
-      <label>Client secret<input type="password" name="client_secret" placeholder="{{ config.client_secret_masked or 'Optional for delegated sign-in' }}"></label>
+      <label>Tenant ID<input name="tenant_id" value="{{ config.tenant_id }}" data-validate="tenant" autocomplete="off"><small class="field-error"></small></label>
+      <label>Client ID<input name="client_id" value="{{ config.client_id }}" data-validate="guid" autocomplete="off"><small class="field-error"></small></label>
+      <label>Client secret
+        <div class="secret-control">
+          <input type="password" name="client_secret" placeholder="{{ config.client_secret_masked or 'Optional for delegated sign-in' }}" data-secret autocomplete="new-password">
+          <button class="icon-btn secret-toggle" type="button" aria-label="Reveal client secret" title="Reveal">Show</button>
+          <button class="icon-btn secret-copy" type="button" aria-label="Copy client secret" title="Copy">Copy</button>
+        </div>
+        <small class="field-hint">Stored secrets stay masked. Enter a new value only when rotating credentials.</small>
+      </label>
       <label>Signed-in account<input value="{{ config.oauth_account or 'Not connected' }}" readonly></label>
     </div>
   </section>
@@ -42,7 +65,7 @@
       <p>Blank folder scans every folder. Subject and sender filters keep the parser focused on ESET notifications.</p>
     </div>
     <div class="form-grid">
-      <label>Notifications mailbox<input name="mailbox_address" value="{{ config.mailbox_address }}" placeholder="Blank uses signed-in mailbox"></label>
+      <label>Notifications mailbox<input name="mailbox_address" value="{{ config.mailbox_address }}" placeholder="Blank uses signed-in mailbox" data-validate="email"><small class="field-error"></small></label>
       <label>Folder filter<input name="mail_folder" value="{{ config.mail_folder }}" placeholder="Blank scans every folder"></label>
       <label>ESET sender filter<input name="eset_sender_filter" value="{{ config.eset_sender_filter }}" placeholder="report@protect.eset.com"></label>
       <label>ESET subject filter<input name="eset_subject_filter" value="{{ config.eset_subject_filter }}" placeholder="ESET"></label>
@@ -55,7 +78,15 @@
       <p>Escalations are limited to the first Critical alert per client per rolling 24 hours.</p>
     </div>
     <div class="form-grid">
-      <label class="full-span">Teams webhook URL<input type="password" name="teams_webhook_url" placeholder="{{ config.teams_webhook_url_masked or 'Paste Teams Workflow / Incoming Webhook URL' }}"></label>
+      <label class="full-span">Teams webhook URL
+        <div class="secret-control">
+          <input type="password" name="teams_webhook_url" placeholder="{{ config.teams_webhook_url_masked or 'Paste Teams Workflow / Incoming Webhook URL' }}" data-secret data-validate="teams-webhook" autocomplete="off">
+          <button class="icon-btn secret-toggle" type="button" aria-label="Reveal Teams webhook URL" title="Reveal">Show</button>
+          <button class="icon-btn secret-copy" type="button" aria-label="Copy Teams webhook URL" title="Copy">Copy</button>
+        </div>
+        <small class="field-error"></small>
+      </label>
+      <label>Escalation cooldown hours<input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}"></label>
       <label class="switch-row full-span">
         <input type="checkbox" name="teams_dry_run" {% if config.teams_dry_run %}checked{% endif %}>
         <span>
@@ -69,17 +100,26 @@
   <section class="form-section severity-section" id="severity-assessment">
     <div class="section-heading">
       <h2>Severity assessment</h2>
-      <p>Final score = taxonomy base score + context adjustments, clamped from 0 to 100. Existing alerts are rescored when you save.</p>
+      <p>Final score = taxonomy base score + context adjustments. Failed or unresolved remediation forces Critical. Existing alerts are rescored when you save.</p>
     </div>
 
     <div class="logic-card">
       <strong>Current logic</strong>
       <span>Critical if score >= {{ config.severity_critical_threshold }}. High if >= {{ config.severity_high_threshold }}. Medium if >= {{ config.severity_medium_threshold }}. Otherwise Low.</span>
-      <span>Only Critical alerts are eligible for Teams escalation, and Teams posting is capped to the first Critical alert per client per rolling 24 hours.</span>
+      <span>Unresolved or failed remediation overrides scoring to Critical. Teams posting is capped per client by the configured cooldown.</span>
     </div>
 
     <div class="form-grid scoring-grid">
+      <input type="hidden" name="scoring_preset" id="scoring_preset" value="{{ config.scoring_preset or 'custom' }}">
+
       <div class="score-group-title full-span">Taxonomy base scores</div>
+      <label class="switch-row full-span">
+        <input type="checkbox" name="use_taxonomy_weighting" {% if config.use_taxonomy_weighting %}checked{% endif %}>
+        <span>
+          <strong>Use taxonomy weighting</strong>
+          <small>Enabled by default to preserve the original dashboard severity model. Turn off only when every threat name should start from the same base score.</small>
+        </span>
+      </label>
       <label class="full-span">Taxonomy base scores
         <textarea name="taxonomy_scores" rows="11" spellcheck="false">{{ config.taxonomy_scores }}</textarea>
       </label>
@@ -118,11 +158,30 @@
       <label>Failure/unresolved adjustment<input type="number" name="failure_adjustment" value="{{ config.failure_adjustment }}"></label>
       <label>Successful containment adjustment<input type="number" name="success_adjustment" value="{{ config.success_adjustment }}"></label>
     </div>
+
+    <div class="score-preview">
+      <div class="score-preview-head">
+        <strong>Score preview</strong>
+        <span>Try a detection before saving.</span>
+      </div>
+      <div class="form-grid">
+        <label>Threat name<input id="preview-threat" value="Win32/TestThreat"></label>
+        <label>Hostname<input id="preview-host" value="TEST-ENDPOINT-01"></label>
+        <label>Action taken<input id="preview-action" value="Remediation failed"></label>
+        <label>Containment status<input id="preview-containment" value="Failed"></label>
+        <label>Resolved status<input id="preview-resolved" value="Unresolved"></label>
+        <button class="cmd-btn" id="score-preview-btn" type="button">Calculate score</button>
+      </div>
+      <div class="preview-result" id="score-preview-result">Preview has not run yet.</div>
+    </div>
   </section>
 
   <div class="sticky-save">
-    <button class="cmd-btn cmd-btn-success" type="submit">Save configuration</button>
-    <span>Auto-scan stays at 60 days, refreshes every 60 seconds, and rescoring runs after save.</span>
+    <button class="cmd-btn cmd-btn-success" id="settings-save-btn" type="submit">
+      <span class="save-spinner" aria-hidden="true"></span>
+      <span class="save-label">Save configuration</span>
+    </button>
+    <span id="settings-dirty-note">Auto-scan stays at 60 days, refreshes every 60 seconds, and rescoring runs after save.</span>
   </div>
 </form>
 {% endblock %}

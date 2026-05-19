@@ -49,6 +49,7 @@ class AppConfig:
     start_date: str = ""
     poll_interval_seconds: int = 60
     taxonomy_scores: str = DEFAULT_TAXONOMY_SCORES
+    use_taxonomy_weighting: bool = True
     unknown_base_score: int = 30
     severity_critical_threshold: int = 95
     severity_high_threshold: int = 70
@@ -73,6 +74,7 @@ class AppConfig:
     host_alert_adjustment: int = 10
     failure_adjustment: int = 20
     success_adjustment: int = -20
+    scoring_preset: str = "containment"
 
 
 @dataclass(slots=True)
@@ -97,6 +99,9 @@ class ParsedAlert:
     operating_system: str = ""
     raw_email_body: str = ""
     score: int = 0
+    score_reasons: str = ""
+    escalation_reason: str = ""
+    policy_version: str = "containment-v1"
 
     def as_dict(self) -> dict[str, Any]:
         data = {field.name: getattr(self, field.name) for field in fields(self)}

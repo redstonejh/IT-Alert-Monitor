@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -9,12 +10,22 @@ from app.logger import setup_logging
 from app.parser import parse_graph_message
 from app.rules import evaluate_alert, record_escalation, should_send_escalation
 from app.scoring import score_alert
-from app.storage import add_event, add_teams_message, alert_exists, get_config, get_state, save_alert, update_state
+from app.storage import (
+    add_event,
+    add_teams_message,
+    alert_exists,
+    get_config,
+    get_state,
+    save_alert,
+    update_alert_escalation_reason,
+    update_state,
+)
 from app.teams_notifier import TeamsNotifier
 
 logger = logging.getLogger(__name__)
 DEFAULT_LOOKBACK_DAYS = 60
 DEFAULT_POLL_INTERVAL_SECONDS = 60
+REQUIRED_PARSE_FIELDS = ("threat_name", "hostname")
 
 
 def _date_text(value: datetime) -> str:
@@ -36,27 +47,49 @@ def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
     init_db()
     config = get_config()
     notifier = TeamsNotifier(config.teams_webhook_url)
-    processed = skipped = escalated = noise = 0
+    processed = skipped = escalated = noise = parse_failed = 0
+    parse_failure_samples: list[str] = []
 
     for message in messages:
         message_id = message.get("id", "")
         if not message_id or alert_exists(message_id):
             skipped += 1
             continue
-        alert = parse_graph_message(message)
-        score, label, _reasons = score_alert(
+        try:
+            alert = parse_graph_message(message)
+        except Exception as exc:
+            parse_failed += 1
+            subject = message.get("subject", "No subject")
+            parse_failure_samples.append(f"{subject}: {exc}")
+            add_event(None, "parse_failed", f"{source}: {subject}: {exc}")
+            logger.exception("Parser failed for message id=%s", message_id)
+            continue
+        missing_fields = [
+            field for field in REQUIRED_PARSE_FIELDS if not getattr(alert, field, "")
+        ]
+        if missing_fields:
+            parse_failed += 1
+            subject = alert.subject or message.get("subject", "No subject")
+            detail = f"missing {', '.join(missing_fields)}"
+            parse_failure_samples.append(f"{subject}: {detail}")
+            add_event(None, "parse_failed", f"{source}: {subject}: {detail}")
+            skipped += 1
+            continue
+        score, label, reasons = score_alert(
             alert.threat_name, alert.hostname, alert.received_time,
             alert.action_taken, alert.containment_status, alert.resolved_status,
             config,
         )
         alert.severity = label
         alert.score = score
+        alert.score_reasons = json.dumps(reasons)
         alert_id = save_alert(alert)
         if alert_id is None:
             skipped += 1
             continue
         processed += 1
         decision = evaluate_alert(alert, config)
+        update_alert_escalation_reason(alert_id, decision.reason)
         if decision.should_alert:
             if should_send_escalation(decision, config):
                 payload = notifier.format_alert(alert, decision.reason, decision.count)
@@ -84,15 +117,24 @@ def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
             noise += 1
 
     update_state("last_scan_time", datetime.now(timezone.utc).isoformat())
+    update_state("last_parse_failed_count", str(parse_failed))
+    update_state("last_parse_failed_samples", json.dumps(parse_failure_samples[:5]))
     logger.info(
-        "%s scan complete: processed=%s skipped=%s escalated=%s noise=%s",
+        "%s scan complete: processed=%s skipped=%s escalated=%s noise=%s parse_failed=%s",
         source,
         processed,
         skipped,
         escalated,
         noise,
+        parse_failed,
     )
-    return {"processed": processed, "skipped": skipped, "escalated": escalated, "noise": noise}
+    return {
+        "processed": processed,
+        "skipped": skipped,
+        "escalated": escalated,
+        "noise": noise,
+        "parse_failed": parse_failed,
+    }
 
 
 def backfill_severity(force: bool = False) -> int:
@@ -116,7 +158,7 @@ def backfill_severity(force: bool = False) -> int:
             action_taken       = row["action_taken"]       or _extract(FIELD_PATTERNS["action_taken"], raw)
             containment_status = row["containment_status"] or _extract(FIELD_PATTERNS["containment_status"], raw)
             resolved_status    = row["resolved_status"]    or _extract(FIELD_PATTERNS["resolved_status"], raw)
-            score, label, _ = score_alert(
+            score, label, reasons = score_alert(
                 row["threat_name"] or "",
                 row["hostname"] or "",
                 received,
@@ -128,8 +170,18 @@ def backfill_severity(force: bool = False) -> int:
             with get_connection() as conn:
                 conn.execute(
                     "UPDATE alerts SET severity = ?, score = ?, action_taken = ?, "
-                    "containment_status = ?, resolved_status = ? WHERE id = ?",
-                    (label, score, action_taken, containment_status, resolved_status, row["id"]),
+                    "containment_status = ?, resolved_status = ?, score_reasons = ?, "
+                    "policy_version = ? WHERE id = ?",
+                    (
+                        label,
+                        score,
+                        action_taken,
+                        containment_status,
+                        resolved_status,
+                        json.dumps(reasons),
+                        "containment-v1",
+                        row["id"],
+                    ),
                 )
             updated += 1
         except Exception:

@@ -10,7 +10,7 @@ from app.config import get_app_settings
 from app.database import init_db
 from app.storage import get_config
 from app.logger import setup_logging
-from app.routes import actions, alerts, auth, dashboard, settings
+from app.routes import actions, alerts, api, auth, dashboard, settings
 from app.scanner import DEFAULT_POLL_INTERVAL_SECONDS, backfill_severity, run_scan
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
     app.include_router(dashboard.router)
     app.include_router(settings.router)
+    app.include_router(api.router)
     app.include_router(auth.router)
     app.include_router(alerts.router)
     app.include_router(actions.router)

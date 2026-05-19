@@ -11,3 +11,8 @@ __pycache__/
 venv/
 .pytest_cache/
 .uvicorn.pid
+.claude/
+server_dashboard.html
+server_settings.html
+style_check.css
+tests/__pycache__/

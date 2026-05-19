@@ -42,8 +42,16 @@ def _taxonomy(config: AppConfig) -> list[tuple[str, int]]:
 
 
 def base_score(threat_name: str, config: AppConfig | None = None) -> int:
-    """Return the configured 0-100 base score from the ESET threat taxonomy."""
+    """Return the configured 0-100 starting score.
+
+    The default model treats every threat name equally and lets containment,
+    recurrence, persistence, spread, and velocity drive severity. Taxonomy
+    weighting is preserved as an optional mode for teams that still want
+    inherent threat-name risk to influence the starting score.
+    """
     cfg = _config(config)
+    if not cfg.use_taxonomy_weighting:
+        return cfg.unknown_base_score
     if not threat_name:
         return cfg.unknown_base_score
 
@@ -53,6 +61,50 @@ def base_score(threat_name: str, config: AppConfig | None = None) -> int:
             return score
 
     return cfg.unknown_base_score
+
+
+def is_unresolved_or_failed(
+    action_taken: str = "",
+    containment_status: str = "",
+    resolved_status: str = "",
+) -> bool:
+    """Return True when ESET says the issue still needs attention."""
+    status_blob = " ".join([action_taken, containment_status, resolved_status]).lower()
+    if not status_blob.strip():
+        return False
+    failure_patterns = (
+        r"\bfailed\b",
+        r"\bfailure\b",
+        r"\bunresolved\b",
+        r"\bnot\s+resolved\b",
+        r"\bnot\s+cleaned\b",
+        r"\bunable\s+to\s+(clean|remove|delete|quarantine|resolve)\b",
+        r"\baction\s+required\b",
+        r"\bremediation\s+(failed|required)\b",
+    )
+    return any(re.search(pattern, status_blob) for pattern in failure_patterns)
+
+
+def is_successfully_contained(
+    action_taken: str = "",
+    containment_status: str = "",
+    resolved_status: str = "",
+) -> bool:
+    """Return True only for clear positive containment language."""
+    status_blob = " ".join([action_taken, containment_status, resolved_status]).lower()
+    if is_unresolved_or_failed(action_taken, containment_status, resolved_status):
+        return False
+    success_patterns = (
+        r"\bcleaned\b",
+        r"\bdeleted\b",
+        r"\bresolved\b",
+        r"\bquarantined\b",
+        r"\bremoved\b",
+        r"\bblocked\b",
+        r"\bterminated\b",
+        r"\bcontained\b",
+    )
+    return any(re.search(pattern, status_blob) for pattern in success_patterns)
 
 
 def severity_label(score: int, config: AppConfig | None = None) -> str:
@@ -91,11 +143,13 @@ def contextual_adjustments(
     host_window = (now - timedelta(hours=cfg.host_alert_window_hours)).isoformat()
 
     with get_connection() as conn:
-        same_recent = conn.execute(
-            "SELECT COUNT(*) AS c FROM alerts "
-            "WHERE threat_name = ? AND hostname = ? AND received_time >= ? AND received_time < ?",
-            (threat_name, hostname, repeat_window, now_iso),
-        ).fetchone()["c"]
+        same_recent = 0
+        if threat_name and hostname:
+            same_recent = conn.execute(
+                "SELECT COUNT(*) AS c FROM alerts "
+                "WHERE threat_name = ? AND hostname = ? AND received_time >= ? AND received_time < ?",
+                (threat_name, hostname, repeat_window, now_iso),
+            ).fetchone()["c"]
         if same_recent >= 3:
             adjustment += cfg.repeated_same_host_3_adjustment
             reasons.append(f"same threat hit this host {same_recent + 1} times")
@@ -106,11 +160,13 @@ def contextual_adjustments(
             adjustment += cfg.repeated_same_host_1_adjustment
             reasons.append(f"same threat hit this host {same_recent + 1} times")
 
-        hosts_in_window = conn.execute(
-            "SELECT COUNT(DISTINCT hostname) AS c FROM alerts "
-            "WHERE threat_name = ? AND received_time >= ? AND received_time <= ? AND hostname != ''",
-            (threat_name, campaign_window, now_iso),
-        ).fetchone()["c"]
+        hosts_in_window = 0
+        if threat_name:
+            hosts_in_window = conn.execute(
+                "SELECT COUNT(DISTINCT hostname) AS c FROM alerts "
+                "WHERE threat_name = ? AND received_time >= ? AND received_time <= ? AND hostname != ''",
+                (threat_name, campaign_window, now_iso),
+            ).fetchone()["c"]
         if hosts_in_window >= 5:
             adjustment += cfg.campaign_endpoint_5_adjustment
             reasons.append(f"spreading to {hosts_in_window} endpoints")
@@ -120,11 +176,13 @@ def contextual_adjustments(
         elif hosts_in_window >= 2:
             adjustment += cfg.campaign_endpoint_2_adjustment
 
-        distinct_days = conn.execute(
-            "SELECT COUNT(DISTINCT substr(received_time, 1, 10)) AS c FROM alerts "
-            "WHERE threat_name = ? AND hostname = ? AND received_time <= ?",
-            (threat_name, hostname, now_iso),
-        ).fetchone()["c"]
+        distinct_days = 0
+        if threat_name and hostname:
+            distinct_days = conn.execute(
+                "SELECT COUNT(DISTINCT substr(received_time, 1, 10)) AS c FROM alerts "
+                "WHERE threat_name = ? AND hostname = ? AND received_time <= ?",
+                (threat_name, hostname, now_iso),
+            ).fetchone()["c"]
         if distinct_days >= 4:
             adjustment += cfg.persistence_4_day_adjustment
             reasons.append(f"persisting {distinct_days} days")
@@ -132,16 +190,19 @@ def contextual_adjustments(
             adjustment += cfg.persistence_2_day_adjustment
             reasons.append(f"recurring across {distinct_days} days")
 
-        count_velocity = conn.execute(
-            "SELECT COUNT(*) AS c FROM alerts "
-            "WHERE threat_name = ? AND received_time >= ? AND received_time <= ?",
-            (threat_name, velocity_window, now_iso),
-        ).fetchone()["c"]
-        count_baseline = conn.execute(
-            "SELECT COUNT(*) AS c FROM alerts "
-            "WHERE threat_name = ? AND received_time >= ? AND received_time < ?",
-            (threat_name, baseline_window, campaign_window),
-        ).fetchone()["c"]
+        count_velocity = 0
+        count_baseline = 0
+        if threat_name:
+            count_velocity = conn.execute(
+                "SELECT COUNT(*) AS c FROM alerts "
+                "WHERE threat_name = ? AND received_time >= ? AND received_time <= ?",
+                (threat_name, velocity_window, now_iso),
+            ).fetchone()["c"]
+            count_baseline = conn.execute(
+                "SELECT COUNT(*) AS c FROM alerts "
+                "WHERE threat_name = ? AND received_time >= ? AND received_time < ?",
+                (threat_name, baseline_window, campaign_window),
+            ).fetchone()["c"]
         recent_rate = count_velocity / max(1, cfg.velocity_window_hours)
         baseline_hours = max(1, (cfg.velocity_baseline_days * 24) - cfg.campaign_endpoint_window_hours)
         baseline_rate = count_baseline / baseline_hours if count_baseline else 0
@@ -152,22 +213,21 @@ def contextual_adjustments(
             adjustment += cfg.velocity_adjustment
             reasons.append("alert frequency accelerating")
 
-        host_alerts = conn.execute(
-            "SELECT COUNT(*) AS c FROM alerts "
-            "WHERE hostname = ? AND received_time >= ? AND received_time < ?",
-            (hostname, host_window, now_iso),
-        ).fetchone()["c"]
+        host_alerts = 0
+        if hostname:
+            host_alerts = conn.execute(
+                "SELECT COUNT(*) AS c FROM alerts "
+                "WHERE hostname = ? AND received_time >= ? AND received_time < ?",
+                (hostname, host_window, now_iso),
+            ).fetchone()["c"]
         if host_alerts >= cfg.host_alert_count_threshold:
             adjustment += cfg.host_alert_adjustment
             reasons.append(f"host has {host_alerts} alerts")
 
-    failure_terms = ("failed", "failure", "unresolved", "not cleaned", "action required")
-    success_terms = ("cleaned", "deleted", "resolved", "quarantined", "removed", "blocked", "terminated")
-    status_blob = " ".join([action_taken, containment_status, resolved_status]).lower()
-    if any(term in status_blob for term in failure_terms):
+    if is_unresolved_or_failed(action_taken, containment_status, resolved_status):
         adjustment += cfg.failure_adjustment
         reasons.append("action failed or threat unresolved")
-    elif any(term in status_blob for term in success_terms):
+    elif is_successfully_contained(action_taken, containment_status, resolved_status):
         adjustment += cfg.success_adjustment
         reasons.append("contained by antivirus")
 
@@ -195,5 +255,46 @@ def score_alert(
         resolved_status,
         cfg,
     )
-    total = max(0, min(100, base + ctx))
+    if is_unresolved_or_failed(action_taken, containment_status, resolved_status):
+        total = 100
+        if "unresolved override forced Critical severity" not in reasons:
+            reasons.append("unresolved override forced Critical severity")
+    else:
+        total = max(0, min(100, base + ctx))
     return total, severity_label(total, cfg), reasons
+
+
+def scoring_breakdown(
+    threat_name: str,
+    hostname: str,
+    received_time: datetime,
+    action_taken: str = "",
+    containment_status: str = "",
+    resolved_status: str = "",
+    config: AppConfig | None = None,
+) -> dict[str, object]:
+    cfg = _config(config)
+    base = base_score(threat_name, cfg)
+    ctx, reasons = contextual_adjustments(
+        threat_name,
+        hostname,
+        received_time,
+        action_taken,
+        containment_status,
+        resolved_status,
+        cfg,
+    )
+    override = is_unresolved_or_failed(action_taken, containment_status, resolved_status)
+    score = 100 if override else max(0, min(100, base + ctx))
+    label = severity_label(score, cfg)
+    if override and "unresolved override forced Critical severity" not in reasons:
+        reasons.append("unresolved override forced Critical severity")
+    return {
+        "base_score": base,
+        "context_adjustment": ctx,
+        "score": score,
+        "severity": label,
+        "reasons": reasons,
+        "unresolved_override": override,
+        "taxonomy_weighting": cfg.use_taxonomy_weighting,
+    }

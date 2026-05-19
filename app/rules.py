@@ -2,9 +2,11 @@ from datetime import datetime, timedelta, timezone
 
 from app.database import get_connection
 from app.models import AppConfig, EscalationDecision, ParsedAlert
+from app.scoring import is_unresolved_or_failed
 
 REASON_LABELS: dict[str, str] = {
     "critical_severity":                   "First critical alert for client",
+    "unresolved_override":                 "Unresolved issue requires attention",
     "same_threat_same_host_repeated":      "Same threat repeated on the same host",
     "same_threat_same_host_multiple_days": "Same threat persisting across multiple days",
     "same_host_multiple_threats_24h":      "Multiple different threats on the same host (24 h)",
@@ -23,16 +25,21 @@ def client_key(alert: ParsedAlert) -> str:
 
 
 def evaluate_alert(alert: ParsedAlert, config: AppConfig) -> EscalationDecision:
-    """Escalate only the first critical alert per client in a 24-hour window."""
+    """Escalate hard failures/unresolved alerts and computed Critical alerts."""
+    if is_unresolved_or_failed(alert.action_taken, alert.containment_status, alert.resolved_status):
+        fingerprint = f"unresolved_client_{config.escalation_cooldown_hours}h|{client_key(alert)}"
+        return EscalationDecision(True, "unresolved_override", fingerprint, 4, 1)
     if (alert.severity or "").lower() != "critical":
         return EscalationDecision(False, "noise", "", 0, 1)
-    fingerprint = f"critical_client_24h|{client_key(alert)}"
+    fingerprint = f"critical_client_{config.escalation_cooldown_hours}h|{client_key(alert)}"
     return EscalationDecision(True, "critical_severity", fingerprint, 4, 1)
 
 
 def should_send_escalation(decision: EscalationDecision, config: AppConfig) -> bool:
-    """Allow at most one escalation per client fingerprint per 24 hours."""
-    window_start = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    """Allow at most one escalation per fingerprint during the configured cooldown."""
+    window_start = (
+        datetime.now(timezone.utc) - timedelta(hours=config.escalation_cooldown_hours)
+    ).isoformat()
     with get_connection() as conn:
         row = conn.execute(
             "SELECT last_alerted_at FROM escalations WHERE fingerprint = ?",

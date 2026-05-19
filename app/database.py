@@ -106,3 +106,12 @@ def init_db() -> None:
             conn.execute("ALTER TABLE alerts ADD COLUMN score INTEGER NOT NULL DEFAULT 0")
         except Exception:
             pass  # column already exists
+        for column_sql in (
+            "ALTER TABLE alerts ADD COLUMN score_reasons TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE alerts ADD COLUMN escalation_reason TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE alerts ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'containment-v1'",
+        ):
+            try:
+                conn.execute(column_sql)
+            except Exception:
+                pass  # column already exists

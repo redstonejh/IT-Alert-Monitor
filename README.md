@@ -17,11 +17,12 @@ The application focuses on reducing Teams noise. Alerts are recorded historicall
 - Microsoft Graph OAuth / app credential mailbox access
 - No Outlook basic authentication or mailbox password storage
 - Recursive folder scanning when no folder filter is configured
-- Historical backfill with dashboard presets from Today through 5 years
+- Historical backfill with dashboard presets from Today through 1 year
 - SQLite-backed alert, event, scan, and escalation history
 - Configurable ESET sender and subject filters
 - ESET alert body parsing for hostname, user, threat, severity, action, status, IP, OS, and raw email body
-- Configurable severity scoring model with taxonomy weights and contextual adjustments
+- Configurable severity scoring model with taxonomy base scores plus recurrence, spread, persistence, velocity, host volume, and remediation outcome
+- JSON API endpoints for dashboard, alert detail, settings, and scoring preview
 - Dashboard metric filters for total alerts, Critical clients, repeated threats, unresolved cases, and escalations
 - Alert detail pages with parsed fields, raw email body, escalation context, and historical matches
 - Teams webhook delivery with local preview mode
@@ -181,8 +182,9 @@ The app sends Teams messages only when escalation policy allows it. By default, 
 
 Teams escalation policy:
 
-- Only Critical severity alerts are eligible for Teams.
-- Teams posts are capped to the first Critical alert per client in a rolling 24-hour window.
+- Critical severity alerts are eligible for Teams.
+- Failed or unresolved remediation forces Critical severity and is eligible for Teams.
+- Teams posts are capped per client during the configured escalation cooldown.
 - Client identity uses ESET client name, then hostname, then computer name.
 - Non-escalated alerts remain in SQLite for dashboard history and investigation.
 
@@ -199,11 +201,7 @@ final score = taxonomy base score
             - successful containment discount
 ```
 
-## TODO
-
-- Align the settings page command bar and card spacing exactly with the dashboard layout.
-- Ensure the Configure page header, button placement, and card spacing match the Dashboard experience.
-- Confirm unsaved settings warnings behave consistently before navigating away.
+Failed or unresolved remediation is a hard override: the alert is scored as Critical even if the underlying threat name would otherwise start from a low base score.
 
 Scores are clamped from `0` to `100`, then mapped to severity buckets:
 
@@ -215,7 +213,7 @@ Scores are clamped from `0` to `100`, then mapped to severity buckets:
 Configurable scoring inputs include:
 
 - ESET taxonomy keyword scores
-- Unknown threat base score
+- Optional equal threat base score mode
 - Critical / High / Medium thresholds
 - Same-host repeat event adjustments
 - Same-threat multi-endpoint spread adjustments
@@ -239,7 +237,20 @@ The dashboard provides:
 - Recent alerts table
 - Clickable escalation feed
 - Alert detail pages with raw email body and historical matches
-- Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr, 2yr, 5yr
+- Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr
+
+## Frontend / Backend API
+
+The current UI is still served by FastAPI/Jinja templates, but the backend now exposes JSON endpoints that can support a standalone frontend:
+
+```text
+GET  /api/dashboard
+GET  /api/alerts/{alert_id}
+GET  /api/settings
+POST /api/scoring-preview
+```
+
+This allows the frontend to be untangled incrementally instead of requiring a risky rewrite.
 
 Selecting a date range backfills missing historical coverage when needed, then filters the dashboard to that range.
 
@@ -397,6 +408,7 @@ app/
 
 app/routes/
   dashboard.py
+  api.py
   settings.py
   alerts.py
   actions.py
@@ -420,5 +432,5 @@ Before publishing to GitHub:
 - Remove real `.env` files.
 - Remove `data/`, `logs/`, `.uvicorn.pid`, and local SQLite files.
 - Confirm no screenshots include customer names, usernames, hostnames, webhook URLs, tenant IDs, or client IDs.
-- Add a license if you intend others to reuse the project.
+- Add a license if you intend others to reuse the project. MIT is a practical default for permissive internal tooling; keep it private or use a proprietary notice if you do not want reuse.
 - Consider adding sanitized screenshots under a dedicated `docs/` or `assets/` folder.

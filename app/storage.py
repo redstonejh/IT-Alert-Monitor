@@ -1,5 +1,6 @@
 from dataclasses import fields
 from datetime import datetime, timedelta, timezone
+import json
 from typing import Any
 
 from app.config import get_app_settings
@@ -8,6 +9,10 @@ from app.models import AppConfig, ParsedAlert
 from app.security import SecretStore
 
 SENSITIVE_KEYS = {"client_secret", "teams_webhook_url", "oauth_token_cache", "oauth_flow"}
+STATUS_SQL = (
+    "LOWER(COALESCE(action_taken, '') || ' ' || "
+    "COALESCE(containment_status, '') || ' ' || COALESCE(resolved_status, ''))"
+)
 
 
 def _env_overrides(config: AppConfig) -> AppConfig:
@@ -115,6 +120,14 @@ def save_alert(alert: ParsedAlert) -> int | None:
         return int(cursor.lastrowid)
 
 
+def update_alert_escalation_reason(alert_id: int, reason: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE alerts SET escalation_reason = ? WHERE id = ?",
+            (reason, alert_id),
+        )
+
+
 def get_alert(alert_id: int) -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
@@ -139,8 +152,9 @@ def list_alerts(
         conds.append("LOWER(severity) = 'critical'")
     elif metric == "unresolved":
         conds.append(
-            "(LOWER(action_taken || ' ' || containment_status || ' ' || resolved_status) "
-            "LIKE '%failed%' OR LOWER(resolved_status) LIKE '%unresolved%')"
+            f"({STATUS_SQL} LIKE '%failed%' OR {STATUS_SQL} LIKE '%unresolved%' "
+            f"OR {STATUS_SQL} LIKE '%not resolved%' OR {STATUS_SQL} LIKE '%not cleaned%' "
+            f"OR {STATUS_SQL} LIKE '%action required%')"
         )
     elif metric == "repeated":
         repeated_range = ""
@@ -215,6 +229,8 @@ def list_current_escalation_cases(limit: int = 25, start: str = "", end: str = "
             continue
         last_by_client[client] = received
         item["reason"] = "critical_severity"
+        if item.get("escalation_reason"):
+            item["reason"] = item["escalation_reason"]
         item["status"] = "current_policy"
         item["payload"] = ""
         item["alert_id"] = item["id"]
@@ -360,13 +376,14 @@ def dashboard_stats(start: str = "", end: str = "") -> dict[str, Any]:
         failed = conn.execute(
             f"""
             SELECT COUNT(*) AS c FROM alerts
-            WHERE (LOWER(action_taken || ' ' || containment_status || ' ' || resolved_status)
-            LIKE '%failed%' OR LOWER(resolved_status) LIKE '%unresolved%'){df}
+            WHERE ({STATUS_SQL} LIKE '%failed%' OR {STATUS_SQL} LIKE '%unresolved%'
+            OR {STATUS_SQL} LIKE '%not resolved%' OR {STATUS_SQL} LIKE '%not cleaned%'
+            OR {STATUS_SQL} LIKE '%action required%'){df}
             """,
             date_params,
         ).fetchone()["c"]
         dry_runs = conn.execute(
-            "SELECT COUNT(*) AS c FROM teams_messages WHERE status = 'dry_run'"
+            "SELECT COUNT(*) AS c FROM teams_messages WHERE status IN ('dry_run', 'preview')"
         ).fetchone()["c"]
         last_teams_message = conn.execute(
             "SELECT created_at FROM teams_messages ORDER BY created_at DESC LIMIT 1"
@@ -379,6 +396,8 @@ def dashboard_stats(start: str = "", end: str = "") -> dict[str, Any]:
         "teams_logged": len(list_current_escalation_cases(10000, start=start, end=end)),
         "dry_runs": dry_runs,
         "last_scan_time": get_state("last_scan_time"),
+        "last_parse_failed_count": int(get_state("last_parse_failed_count") or 0),
+        "last_parse_failed_samples": json.loads(get_state("last_parse_failed_samples") or "[]"),
         "last_teams_alert_time": get_state("last_teams_alert_time"),
         "last_teams_message_time": last_teams_message["created_at"] if last_teams_message else "",
         "scan_range_label": get_state("last_scan_range_label"),

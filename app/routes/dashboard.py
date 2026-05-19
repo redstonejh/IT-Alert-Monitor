@@ -1,11 +1,12 @@
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
+import json
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
 from app.oauth import local_redirect_uri
-from app.rules import reason_label
 from app.scanner import DEFAULT_LOOKBACK_DAYS, run_scan, run_scan_range
 from app.storage import (
     dashboard_stats,
@@ -26,7 +27,6 @@ RANGE_PRESETS = [
     {"days": 90, "label": "Last 90 days", "short": "90d"},
     {"days": 180, "label": "Last 6 months", "short": "6mo"},
     {"days": 365, "label": "Last year", "short": "1yr"},
-    
 ]
 METRIC_LABELS = {
     "": "Alerts",
@@ -54,19 +54,40 @@ def _parse_payload(payload: str) -> dict:
     return result
 
 
-def _pacific_offset(dt: datetime) -> tuple[timedelta, str]:
-    """Return UTC offset and abbreviation for US Pacific time (no external packages)."""
-    year = dt.year
-    def nth_sunday(y: int, month: int, n: int) -> datetime:
-        first = datetime(y, month, 1, tzinfo=timezone.utc)
-        days_to_sunday = (6 - first.weekday()) % 7
-        return first + timedelta(days=days_to_sunday + 7 * (n - 1))
+def _decode_reasons(value: object) -> list[str]:
+    if not value:
+        return []
+    try:
+        loaded = json.loads(str(value))
+    except json.JSONDecodeError:
+        return [str(value)]
+    if isinstance(loaded, list):
+        return [str(item) for item in loaded]
+    return [str(loaded)]
 
-    dst_start = nth_sunday(year, 3, 2) + timedelta(hours=10)
-    dst_end   = nth_sunday(year, 11, 1) + timedelta(hours=9)
-    if dst_start <= dt.replace(tzinfo=timezone.utc) < dst_end:
-        return timedelta(hours=-7), "PDT"
-    return timedelta(hours=-8), "PST"
+
+def _split_domain_user(value: object) -> tuple[str, str]:
+    text = str(value or "").strip()
+    if "\\" in text:
+        domain, user = text.split("\\", 1)
+        return domain.strip(), user.strip()
+    if "@" in text:
+        user, domain = text.split("@", 1)
+        return domain.strip(), user.strip()
+    return "", text
+
+
+def _escalation_title(row: dict) -> str:
+    severity = str(row.get("severity") or "Critical").strip().title()
+    host = str(row.get("hostname") or row.get("computer_name") or "unknown host").strip()
+    domain, user = _split_domain_user(row.get("username"))
+    if user and domain:
+        return f"{severity} Alert: {user} @ {domain}"
+    if user:
+        return f"{severity} Alert: {user}"
+    if domain:
+        return f"{severity} Alert: {host} @ {domain}"
+    return f"{severity} Alert: {host}"
 
 
 def _format_date_short(d: str) -> str:
@@ -77,6 +98,20 @@ def _format_date_short(d: str) -> str:
         return d or ""
 
 
+def _pacific_fallback(utc: datetime) -> datetime:
+    year = utc.year
+
+    def nth_sunday(y: int, month: int, n: int) -> datetime:
+        first = datetime(y, month, 1, tzinfo=timezone.utc)
+        days_to_sunday = (6 - first.weekday()) % 7
+        return first + timedelta(days=days_to_sunday + 7 * (n - 1))
+
+    dst_start = nth_sunday(year, 3, 2) + timedelta(hours=10)
+    dst_end = nth_sunday(year, 11, 1) + timedelta(hours=9)
+    offset = timedelta(hours=-7 if dst_start <= utc < dst_end else -8)
+    return utc + offset
+
+
 def _format_datetime(value: object) -> str:
     if not value:
         return ""
@@ -85,8 +120,10 @@ def _format_datetime(value: object) -> str:
         utc = datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(timezone.utc)
     except ValueError:
         return text
-    offset, _ = _pacific_offset(utc)
-    local = utc + offset
+    try:
+        local = utc.astimezone(ZoneInfo("America/Los_Angeles"))
+    except ZoneInfoNotFoundError:
+        local = _pacific_fallback(utc)
     hour = local.hour % 12 or 12
     return f"{local:%m/%d/%y} {hour}:{local:%M %p}"
 
@@ -169,6 +206,7 @@ def dashboard(request: Request):
     stats["scan_range_display"] = active_label
     stats["coverage_start_display"] = _format_date_short(get_state("scan_coverage_start"))
     stats["coverage_end_display"] = _format_date_short(get_state("scan_coverage_end"))
+    stats["poll_interval_seconds"] = config.get("poll_interval_seconds") or 60
 
     if active_metric == "escalated":
         recent_alerts = list_current_escalation_cases(500, start=view_start, end=view_end)
@@ -176,10 +214,12 @@ def dashboard(request: Request):
         recent_alerts = list_alerts(500, start=view_start, end=view_end, metric=active_metric)
     for alert in recent_alerts:
         alert["received_display"] = _format_datetime(alert.get("received_time"))
+        alert["score_reasons_list"] = _decode_reasons(alert.get("score_reasons"))
     teams_messages = list_current_escalation_cases(50, start=view_start, end=view_end)
     for message in teams_messages:
         message["created_display"] = _format_datetime(message.get("created_at"))
-        message["reason_label"] = reason_label(message.get("reason", ""))
+        message["reason_label"] = _escalation_title(message)
+        message["domain"], message["user_display"] = _split_domain_user(message.get("username"))
         message["parsed"] = _parse_payload(message.get("payload", ""))
     return templates.TemplateResponse(
         "dashboard.html",
