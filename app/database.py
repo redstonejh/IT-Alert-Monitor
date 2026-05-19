@@ -99,6 +99,26 @@ def init_db() -> None:
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS acronis_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id TEXT NOT NULL UNIQUE,
+                internet_message_id TEXT,
+                received_time TEXT NOT NULL,
+                subject TEXT,
+                sender TEXT,
+                severity TEXT,
+                alert_type TEXT,
+                device TEXT,
+                plan_name TEXT,
+                alert_group TEXT,
+                account TEXT,
+                raw_email_body TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_acronis_received_time
+                ON acronis_alerts(received_time);
             """
         )
         # Migrate: add score column to existing databases

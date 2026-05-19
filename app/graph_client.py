@@ -4,7 +4,6 @@ from urllib.parse import quote, urlencode
 import msal
 import requests
 
-from app.models import AppConfig
 from app.storage import get_setting, save_setting
 
 GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
@@ -12,7 +11,7 @@ DELEGATED_SCOPES = ["User.Read", "Mail.Read"]
 
 
 class GraphClient:
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config) -> None:
         self.config = config
 
     def _authority(self) -> str:
@@ -174,8 +173,10 @@ class GraphClient:
 
     def _local_filter(self, messages: list[dict]) -> list[dict]:
         import re
-        sender_filter = self.config.eset_sender_filter.lower().strip()
-        subject_filter = self.config.eset_subject_filter.lower().strip()
+        sender_filter = (getattr(self.config, "sender_filter", None) or
+                         getattr(self.config, "eset_sender_filter", "")).lower().strip()
+        subject_filter = (getattr(self.config, "subject_filter", None) or
+                          getattr(self.config, "eset_subject_filter", "")).lower().strip()
         subject_pattern = re.compile(r'\b' + re.escape(subject_filter) + r'\b') if subject_filter else None
         matched: list[dict] = []
         for message in messages:

@@ -31,14 +31,14 @@
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
       <span>
-        <strong>{{ config.mailbox_address or config.oauth_account or "Not connected" }}</strong>
-        <small>Connected mailbox</small>
+        <strong>{{ acronis_config.mailbox_address or "Not connected" }}</strong>
+        <small>Acronis mailbox</small>
       </span>
     </div>
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
       <span>
-        <strong>Sync healthy</strong>
+        <strong>{% if last_scan_display %}Sync healthy{% else %}Not scanned yet{% endif %}</strong>
         <small>Last scan {{ last_scan_display or "—" }}</small>
       </span>
     </div>
@@ -97,7 +97,7 @@
             <td class="al-threat">{{ alert.alert_type or "—" }}</td>
             <td class="al-host">{{ alert.device or "—" }}</td>
             <td>{{ alert.plan_name or "—" }}</td>
-            <td>{{ alert.group or "—" }}</td>
+            <td>{{ alert.alert_group or "—" }}</td>
             <td>{{ alert.account or "—" }}</td>
           </tr>
           {% else %}

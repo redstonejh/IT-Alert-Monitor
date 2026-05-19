@@ -1,11 +1,10 @@
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
-from app.storage import get_config, get_state
+from app.storage import acronis_dashboard_stats, get_acronis_config, get_state, list_acronis_alerts
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -43,15 +42,21 @@ def _format_datetime(value: object) -> str:
 
 @router.get("/acronis")
 def acronis_dashboard(request: Request):
-    config = asdict(get_config(include_secrets=False))
-    last_scan_display = _format_datetime(get_state("last_scan_time"))
+    acronis_config = get_acronis_config()
+    last_scan_display = _format_datetime(get_state("acronis_last_scan_time"))
+    stats = acronis_dashboard_stats()
+    raw_alerts = list_acronis_alerts(limit=200)
+    alerts = []
+    for row in raw_alerts:
+        row["received_display"] = _format_datetime(row.get("received_time"))
+        alerts.append(row)
     return templates.TemplateResponse(
         "acronis_dashboard.html",
         {
             "request": request,
-            "config": config,
+            "acronis_config": acronis_config,
             "last_scan_display": last_scan_display,
-            "acronis_stats": {"critical": 0, "error": 0, "warning": 0, "information": 0},
-            "acronis_alerts": [],
+            "acronis_stats": stats,
+            "acronis_alerts": alerts,
         },
     )

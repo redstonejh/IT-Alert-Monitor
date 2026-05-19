@@ -5,7 +5,7 @@ from typing import Any
 
 from app.config import get_app_settings
 from app.database import get_connection
-from app.models import AppConfig, ParsedAlert
+from app.models import AppConfig, AcronisConfig, ParsedAlert, ParsedAcronisAlert
 from app.security import SecretStore
 
 SENSITIVE_KEYS = {"client_secret", "teams_webhook_url", "oauth_token_cache", "oauth_flow"}
@@ -92,6 +92,75 @@ def save_setting(key: str, value: str, sensitive: bool = False) -> None:
             """,
             (key, stored_value, 1 if sensitive else 0),
         )
+
+
+ACRONIS_SENSITIVE_KEYS = {"acronis_client_secret"}
+
+
+def get_acronis_config() -> AcronisConfig:
+    return AcronisConfig(
+        tenant_id=get_setting("acronis_tenant_id"),
+        client_id=get_setting("acronis_client_id"),
+        client_secret=get_setting("acronis_client_secret"),
+        mailbox_address=get_setting("acronis_mailbox_address"),
+        mail_folder=get_setting("acronis_mail_folder"),
+        sender_filter=get_setting("acronis_sender_filter"),
+        subject_filter=get_setting("acronis_subject_filter"),
+        lookback_days=int(get_setting("acronis_lookback_days") or "60"),
+    )
+
+
+def save_acronis_config(data: dict) -> None:
+    for key, value in data.items():
+        if not key.startswith("acronis_"):
+            continue
+        if key in ACRONIS_SENSITIVE_KEYS and not value:
+            continue
+        save_setting(key, str(value), sensitive=(key in ACRONIS_SENSITIVE_KEYS))
+
+
+def acronis_alert_exists(message_id: str) -> bool:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM acronis_alerts WHERE message_id = ?", (message_id,)
+        ).fetchone()
+    return row is not None
+
+
+def save_acronis_alert(alert: ParsedAcronisAlert) -> None:
+    data = alert.as_dict()
+    columns = ", ".join(data.keys())
+    placeholders = ", ".join(["?"] * len(data))
+    with get_connection() as conn:
+        try:
+            conn.execute(
+                f"INSERT INTO acronis_alerts({columns}) VALUES ({placeholders})",
+                tuple(data.values()),
+            )
+        except Exception:
+            pass
+
+
+def list_acronis_alerts(limit: int = 200) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM acronis_alerts ORDER BY received_time DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def acronis_dashboard_stats() -> dict[str, int]:
+    with get_connection() as conn:
+        def _count(where: str) -> int:
+            return conn.execute(
+                f"SELECT COUNT(*) AS c FROM acronis_alerts {where}"
+            ).fetchone()["c"]
+        return {
+            "critical": _count("WHERE LOWER(severity) = 'critical'"),
+            "error": _count("WHERE LOWER(severity) = 'error'"),
+            "warning": _count("WHERE LOWER(severity) = 'warning'"),
+            "information": _count("WHERE LOWER(severity) = 'information'"),
+        }
 
 
 def delete_setting(key: str) -> None:

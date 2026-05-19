@@ -110,6 +110,41 @@ class ParsedAlert:
 
 
 @dataclass(slots=True)
+class AcronisConfig:
+    tenant_id: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    mailbox_address: str = ""
+    mail_folder: str = ""
+    auth_mode: str = "app"
+    sender_filter: str = ""
+    subject_filter: str = ""
+    lookback_days: int = 60
+    start_date: str = ""
+
+
+@dataclass(slots=True)
+class ParsedAcronisAlert:
+    message_id: str
+    internet_message_id: str
+    received_time: datetime
+    subject: str
+    sender: str
+    severity: str = ""
+    alert_type: str = ""
+    device: str = ""
+    plan_name: str = ""
+    alert_group: str = ""
+    account: str = ""
+    raw_email_body: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        data = {field.name: getattr(self, field.name) for field in fields(self)}
+        data["received_time"] = self.received_time.isoformat()
+        return data
+
+
+@dataclass(slots=True)
 class EscalationDecision:
     should_alert: bool
     reason: str

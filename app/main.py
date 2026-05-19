@@ -12,6 +12,7 @@ from app.storage import get_config
 from app.logger import setup_logging
 from app.routes import actions, alerts, api, auth, dashboard, settings
 from app.routes import acronis, acronis_settings
+from app.acronis_scanner import run_acronis_scan
 from app.scanner import DEFAULT_POLL_INTERVAL_SECONDS, backfill_severity, run_scan
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
         interval = get_config().poll_interval_seconds or DEFAULT_POLL_INTERVAL_SECONDS
         if interval > 0:
             asyncio.create_task(_poll_forever(interval))
+            asyncio.create_task(_poll_acronis_forever(interval))
 
     @app.exception_handler(Exception)
     async def handle_exception(request: Request, exc: Exception) -> HTMLResponse:
@@ -58,6 +60,15 @@ async def _poll_forever(interval: int) -> None:
             await asyncio.to_thread(run_scan)
         except Exception:
             logger.exception("Scheduled scan failed")
+
+
+async def _poll_acronis_forever(interval: int) -> None:
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await asyncio.to_thread(run_acronis_scan)
+        except Exception:
+            logger.exception("Acronis scheduled scan failed")
 
 
 app = create_app()

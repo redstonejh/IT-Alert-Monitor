@@ -12,25 +12,20 @@
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
       <span>
-        <strong>{{ config.mailbox_address or config.oauth_account or "Mailbox not connected" }}</strong>
-        <small>Connected mailbox</small>
+        <strong>{{ config.acronis_mailbox_address or "Not connected" }}</strong>
+        <small>Acronis mailbox</small>
       </span>
     </div>
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
       <span>
         <strong>Acronis settings</strong>
-        <small>Separate from ESET configuration</small>
+        <small>Independent from ESET configuration</small>
       </span>
     </div>
   </div>
   <div class="app-nav-actions">
     <a class="cmd-btn" id="settings-dashboard-btn" href="/acronis" data-href="/acronis"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
-    {% if config.oauth_account %}
-      <form method="post" action="/auth/logout">
-        <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
-      </form>
-    {% endif %}
   </div>
 </header>
 
@@ -41,32 +36,31 @@
 <form id="settings-form" class="settings-form clean-settings-form" method="post" action="/acronis/settings">
   <section class="form-section">
     <div class="section-heading">
-      <h2>Microsoft Graph</h2>
-      <p>These IDs come from the Azure App Registration used for Microsoft sign-in. Shared with ESET monitor.</p>
+      <h2>Acronis mailbox access</h2>
+      <p>Azure App Registration credentials used to read the Acronis notifications mailbox. Completely separate from the ESET connection.</p>
     </div>
     <div class="form-grid">
-      <label>Tenant ID<input name="tenant_id" value="{{ config.tenant_id }}" data-validate="tenant" autocomplete="off"><small class="field-error"></small></label>
-      <label>Client ID<input name="client_id" value="{{ config.client_id }}" data-validate="guid" autocomplete="off"><small class="field-error"></small></label>
+      <label>Tenant ID<input name="acronis_tenant_id" value="{{ config.acronis_tenant_id }}" data-validate="tenant" autocomplete="off"><small class="field-error"></small></label>
+      <label>Client ID<input name="acronis_client_id" value="{{ config.acronis_client_id }}" data-validate="guid" autocomplete="off"><small class="field-error"></small></label>
       <label>Client secret
         <div class="secret-control">
-          <input type="password" name="client_secret" placeholder="{{ config.client_secret_masked or 'Optional for delegated sign-in' }}" data-secret autocomplete="new-password">
+          <input type="password" name="acronis_client_secret" placeholder="{{ config.acronis_client_secret_masked or 'Required for app credential access' }}" data-secret autocomplete="new-password">
           <button class="icon-btn secret-toggle" type="button" aria-label="Reveal client secret" title="Reveal">Show</button>
           <button class="icon-btn secret-copy" type="button" aria-label="Copy client secret" title="Copy">Copy</button>
         </div>
         <small class="field-hint">Stored secrets stay masked. Enter a new value only when rotating credentials.</small>
       </label>
-      <label>Signed-in account<input value="{{ config.oauth_account or 'Not connected' }}" readonly></label>
     </div>
   </section>
 
   <section class="form-section">
     <div class="section-heading">
       <h2>Mailbox and filters</h2>
-      <p>Blank folder scans every folder. Sender and subject filters keep the parser focused on Acronis notifications.</p>
+      <p>The mailbox that receives Acronis Cyber Protect Cloud email notifications. Blank folder scans every folder.</p>
     </div>
     <div class="form-grid">
-      <label>Notifications mailbox<input name="mailbox_address" value="{{ config.mailbox_address }}" placeholder="Blank uses signed-in mailbox" data-validate="email"><small class="field-error"></small></label>
-      <label>Folder filter<input name="mail_folder" value="{{ config.mail_folder }}" placeholder="Blank scans every folder"></label>
+      <label>Notifications mailbox<input name="acronis_mailbox_address" value="{{ config.acronis_mailbox_address }}" placeholder="acronis-alerts@yourdomain.com" data-validate="email"><small class="field-error"></small></label>
+      <label>Folder filter<input name="acronis_mail_folder" value="{{ config.acronis_mail_folder }}" placeholder="Blank scans every folder"></label>
       <label>Acronis sender filter<input name="acronis_sender_filter" value="{{ config.acronis_sender_filter }}" placeholder="noreply@acronis.com"></label>
       <label>Acronis subject filter<input name="acronis_subject_filter" value="{{ config.acronis_subject_filter }}" placeholder="Acronis"></label>
     </div>
@@ -100,7 +94,7 @@
   <section class="form-section severity-section">
     <div class="section-heading">
       <h2>Acronis alert taxonomy</h2>
-      <p>Map Acronis alert types to base scores. One entry per line: <code>Alert Type = score</code>. Separate from ESET taxonomy.</p>
+      <p>Map Acronis alert types to base scores. One entry per line: <code>Alert Type = score</code>. Independent from ESET taxonomy.</p>
     </div>
     <div class="form-grid scoring-grid">
       <label class="full-span">Acronis taxonomy scores
@@ -114,7 +108,7 @@
       <span class="save-spinner" aria-hidden="true"></span>
       <span class="save-label">Save configuration</span>
     </button>
-    <span id="settings-dirty-note">Acronis settings are saved separately from ESET configuration.</span>
+    <span id="settings-dirty-note">Acronis settings are saved independently from ESET configuration.</span>
   </div>
 </form>
 {% endblock %}
