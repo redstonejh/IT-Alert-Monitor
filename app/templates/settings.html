@@ -25,7 +25,7 @@
     </div>
   </div>
   <div class="app-nav-actions">
-    <a class="cmd-btn" id="settings-dashboard-btn" href="/dashboard"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
+    <a class="cmd-btn" id="settings-dashboard-btn" href="/dashboard" data-href="/dashboard"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
     {% if config.oauth_account %}
       <form method="post" action="/auth/logout">
         <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>

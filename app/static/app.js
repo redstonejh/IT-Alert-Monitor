@@ -40,6 +40,26 @@ document.querySelectorAll("[data-action]").forEach((button) => {
 document.addEventListener("DOMContentLoaded", () => {
   const showToast = showGlobalToast;
 
+  // Dashboard switcher dropdown
+  const switcherToggle = document.getElementById("dash-switcher-toggle");
+  const switcherMenu = document.getElementById("dash-switch-menu");
+  if (switcherToggle && switcherMenu) {
+    switcherToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = switcherMenu.classList.toggle("open");
+      switcherToggle.setAttribute("aria-expanded", open.toString());
+    });
+    switcherMenu.addEventListener("mouseleave", () => {
+      switcherMenu.classList.remove("open");
+      switcherToggle.setAttribute("aria-expanded", "false");
+    });
+    document.addEventListener("click", () => {
+      switcherMenu.classList.remove("open");
+      switcherToggle.setAttribute("aria-expanded", "false");
+    });
+    switcherMenu.addEventListener("click", (e) => e.stopPropagation());
+  }
+
   if (new URLSearchParams(window.location.search).has("saved")) {
     showToast("Configuration saved and historical alerts rescored.");
   }
@@ -244,7 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (saveFirst) {
       form.submit();
     } else {
-      window.location.href = "/dashboard";
+      window.location.href = dashboardBtn.dataset.href || "/dashboard";
     }
   });
 

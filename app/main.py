@@ -11,6 +11,7 @@ from app.database import init_db
 from app.storage import get_config
 from app.logger import setup_logging
 from app.routes import actions, alerts, api, auth, dashboard, settings
+from app.routes import acronis, acronis_settings
 from app.scanner import DEFAULT_POLL_INTERVAL_SECONDS, backfill_severity, run_scan
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(alerts.router)
     app.include_router(actions.router)
+    app.include_router(acronis.router)
+    app.include_router(acronis_settings.router)
 
     @app.on_event("startup")
     async def start_polling() -> None:

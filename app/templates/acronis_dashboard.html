@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+
+<header class="app-nav">
+  <div class="app-nav-brand-group">
+    <a class="app-nav-brand" href="/acronis" aria-label="Acronis Monitor dashboard">
+      <span class="app-logo app-logo-acronis" aria-hidden="true">A</span>
+      <span>
+        <strong>Acronis Monitor</strong>
+        <small>Backup operations dashboard</small>
+      </span>
+    </a>
+    <div class="dash-switcher">
+      <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
+        Acronis <span class="dash-switch-arrow" aria-hidden="true">▾</span>
+      </button>
+      <div class="dash-switch-menu" id="dash-switch-menu">
+        <a class="dash-switch-opt" href="/dashboard">
+          <span class="dsw-icon dsw-icon-eset" aria-hidden="true">E</span>
+          <span><strong>ESET Alerts</strong><small>Endpoint security</small></span>
+        </a>
+        <a class="dash-switch-opt dash-switch-opt-active" href="/acronis" aria-current="page">
+          <span class="dsw-icon dsw-icon-acronis" aria-hidden="true">A</span>
+          <span><strong>Acronis Backups</strong><small>Backup monitoring</small></span>
+          <span class="dsw-active-check" aria-hidden="true">✓</span>
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="app-nav-status" aria-label="Connection and sync status">
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
+      <span>
+        <strong>{{ config.mailbox_address or config.oauth_account or "Not connected" }}</strong>
+        <small>Connected mailbox</small>
+      </span>
+    </div>
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
+      <span>
+        <strong>Sync healthy</strong>
+        <small>Last scan {{ last_scan_display or "—" }}</small>
+      </span>
+    </div>
+  </div>
+  <div class="app-nav-actions">
+    <a class="cmd-btn" href="/acronis/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
+    <form method="post" action="/auth/logout">
+      <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
+    </form>
+  </div>
+</header>
+
+<div class="stat-band acr-stat-band">
+  <div class="stat-card acr-critical {% if acronis_stats.critical > 0 %}stat-danger{% endif %}">
+    <span class="stat-val">{{ acronis_stats.critical }}</span>
+    <span class="stat-lbl">Critical</span>
+  </div>
+  <div class="stat-card acr-error {% if acronis_stats.error > 0 %}stat-acr-error{% endif %}">
+    <span class="stat-val">{{ acronis_stats.error }}</span>
+    <span class="stat-lbl">Error</span>
+  </div>
+  <div class="stat-card acr-warning {% if acronis_stats.warning > 0 %}stat-warn{% endif %}">
+    <span class="stat-val">{{ acronis_stats.warning }}</span>
+    <span class="stat-lbl">Warning</span>
+  </div>
+  <div class="stat-card acr-information">
+    <span class="stat-val">{{ acronis_stats.information }}</span>
+    <span class="stat-lbl">Information</span>
+  </div>
+</div>
+
+<div class="db-grid acr-db-grid">
+  <div class="db-panel">
+    <div class="db-panel-hd">
+      <span class="db-panel-title">Active Alerts</span>
+      <span class="db-panel-count">{{ acronis_alerts | length }}</span>
+    </div>
+    <div class="db-panel-body">
+      <table class="al-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Severity</th>
+            <th>Alert type</th>
+            <th>Device</th>
+            <th>Plan</th>
+            <th>Group</th>
+            <th>Account</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in acronis_alerts %}
+          <tr>
+            <td class="al-date">{{ alert.received_display }}</td>
+            <td><span class="sev-tag sev-{{ alert.severity | lower }}">{{ alert.severity }}</span></td>
+            <td class="al-threat">{{ alert.alert_type or "—" }}</td>
+            <td class="al-host">{{ alert.device or "—" }}</td>
+            <td>{{ alert.plan_name or "—" }}</td>
+            <td>{{ alert.group or "—" }}</td>
+            <td>{{ alert.account or "—" }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="al-empty">
+              <div class="empty-state empty-state-table">
+                <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
+                <strong>No Acronis alerts yet</strong>
+                <small>Acronis Cyber Protect Cloud backup alerts will appear here once email notifications arrive in the monitored mailbox.</small>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

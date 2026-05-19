@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="app-nav settings-nav">
+  <a class="app-nav-brand" href="/acronis" aria-label="Acronis Monitor dashboard">
+    <span class="app-logo app-logo-acronis" aria-hidden="true">A</span>
+    <span>
+      <strong>Configure</strong>
+      <small>Acronis Monitor settings</small>
+    </span>
+  </a>
+  <div class="app-nav-status" aria-label="Configuration status">
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
+      <span>
+        <strong>{{ config.mailbox_address or config.oauth_account or "Mailbox not connected" }}</strong>
+        <small>Connected mailbox</small>
+      </span>
+    </div>
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
+      <span>
+        <strong>Acronis settings</strong>
+        <small>Separate from ESET configuration</small>
+      </span>
+    </div>
+  </div>
+  <div class="app-nav-actions">
+    <a class="cmd-btn" id="settings-dashboard-btn" href="/acronis" data-href="/acronis"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
+    {% if config.oauth_account %}
+      <form method="post" action="/auth/logout">
+        <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
+      </form>
+    {% endif %}
+  </div>
+</header>
+
+{% if request.query_params.get("saved") %}
+  <p class="sync-note">Acronis configuration saved.</p>
+{% endif %}
+
+<form id="settings-form" class="settings-form clean-settings-form" method="post" action="/acronis/settings">
+  <section class="form-section">
+    <div class="section-heading">
+      <h2>Microsoft Graph</h2>
+      <p>These IDs come from the Azure App Registration used for Microsoft sign-in. Shared with ESET monitor.</p>
+    </div>
+    <div class="form-grid">
+      <label>Tenant ID<input name="tenant_id" value="{{ config.tenant_id }}" data-validate="tenant" autocomplete="off"><small class="field-error"></small></label>
+      <label>Client ID<input name="client_id" value="{{ config.client_id }}" data-validate="guid" autocomplete="off"><small class="field-error"></small></label>
+      <label>Client secret
+        <div class="secret-control">
+          <input type="password" name="client_secret" placeholder="{{ config.client_secret_masked or 'Optional for delegated sign-in' }}" data-secret autocomplete="new-password">
+          <button class="icon-btn secret-toggle" type="button" aria-label="Reveal client secret" title="Reveal">Show</button>
+          <button class="icon-btn secret-copy" type="button" aria-label="Copy client secret" title="Copy">Copy</button>
+        </div>
+        <small class="field-hint">Stored secrets stay masked. Enter a new value only when rotating credentials.</small>
+      </label>
+      <label>Signed-in account<input value="{{ config.oauth_account or 'Not connected' }}" readonly></label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <div class="section-heading">
+      <h2>Mailbox and filters</h2>
+      <p>Blank folder scans every folder. Sender and subject filters keep the parser focused on Acronis notifications.</p>
+    </div>
+    <div class="form-grid">
+      <label>Notifications mailbox<input name="mailbox_address" value="{{ config.mailbox_address }}" placeholder="Blank uses signed-in mailbox" data-validate="email"><small class="field-error"></small></label>
+      <label>Folder filter<input name="mail_folder" value="{{ config.mail_folder }}" placeholder="Blank scans every folder"></label>
+      <label>Acronis sender filter<input name="acronis_sender_filter" value="{{ config.acronis_sender_filter }}" placeholder="noreply@acronis.com"></label>
+      <label>Acronis subject filter<input name="acronis_subject_filter" value="{{ config.acronis_subject_filter }}" placeholder="Acronis"></label>
+    </div>
+  </section>
+
+  <section class="form-section delivery-section">
+    <div class="section-heading">
+      <h2>Teams alerts</h2>
+      <p>Shared with ESET monitor. Escalations are capped per client by the configured cooldown.</p>
+    </div>
+    <div class="form-grid">
+      <label class="full-span">Teams webhook URL
+        <div class="secret-control">
+          <input type="password" name="teams_webhook_url" placeholder="{{ config.teams_webhook_url_masked or 'Paste Teams Workflow / Incoming Webhook URL' }}" data-secret data-validate="teams-webhook" autocomplete="off">
+          <button class="icon-btn secret-toggle" type="button" aria-label="Reveal Teams webhook URL" title="Reveal">Show</button>
+          <button class="icon-btn secret-copy" type="button" aria-label="Copy Teams webhook URL" title="Copy">Copy</button>
+        </div>
+        <small class="field-error"></small>
+      </label>
+      <label>Escalation cooldown hours<input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}"></label>
+      <label class="switch-row full-span">
+        <input type="checkbox" name="teams_dry_run" {% if config.teams_dry_run %}checked{% endif %}>
+        <span>
+          <strong>Local preview mode</strong>
+          <small>Keep enabled while testing. Turn off to post real escalation messages to Teams.</small>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section severity-section">
+    <div class="section-heading">
+      <h2>Acronis alert taxonomy</h2>
+      <p>Map Acronis alert types to base scores. One entry per line: <code>Alert Type = score</code>. Separate from ESET taxonomy.</p>
+    </div>
+    <div class="form-grid scoring-grid">
+      <label class="full-span">Acronis taxonomy scores
+        <textarea name="acronis_taxonomy_scores" rows="11" spellcheck="false">{{ config.acronis_taxonomy_scores }}</textarea>
+      </label>
+    </div>
+  </section>
+
+  <div class="sticky-save">
+    <button class="cmd-btn cmd-btn-success" id="settings-save-btn" type="submit">
+      <span class="save-spinner" aria-hidden="true"></span>
+      <span class="save-label">Save configuration</span>
+    </button>
+    <span id="settings-dirty-note">Acronis settings are saved separately from ESET configuration.</span>
+  </div>
+</form>
+{% endblock %}

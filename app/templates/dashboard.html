@@ -8,13 +8,31 @@
 {# ── CONNECTED DASHBOARD ─────────────────────────────────────────────── #}
 
 <header class="app-nav">
-  <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
-    <span class="app-logo" aria-hidden="true">E!</span>
-    <span>
-      <strong>ESET Alert Monitor</strong>
-      <small>Security operations dashboard</small>
-    </span>
-  </a>
+  <div class="app-nav-brand-group">
+    <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
+      <span class="app-logo" aria-hidden="true">E!</span>
+      <span>
+        <strong>ESET Alert Monitor</strong>
+        <small>Security operations dashboard</small>
+      </span>
+    </a>
+    <div class="dash-switcher">
+      <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
+        ESET <span class="dash-switch-arrow" aria-hidden="true">▾</span>
+      </button>
+      <div class="dash-switch-menu" id="dash-switch-menu">
+        <a class="dash-switch-opt dash-switch-opt-active" href="/dashboard" aria-current="page">
+          <span class="dsw-icon dsw-icon-eset" aria-hidden="true">E</span>
+          <span><strong>ESET Alerts</strong><small>Endpoint security</small></span>
+          <span class="dsw-active-check" aria-hidden="true">✓</span>
+        </a>
+        <a class="dash-switch-opt" href="/acronis">
+          <span class="dsw-icon dsw-icon-acronis" aria-hidden="true">A</span>
+          <span><strong>Acronis Backups</strong><small>Backup monitoring</small></span>
+        </a>
+      </div>
+    </div>
+  </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
