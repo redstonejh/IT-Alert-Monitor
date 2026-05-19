@@ -13,21 +13,21 @@
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
       <span>
         <strong>{{ config.mailbox_address or config.oauth_account or "Mailbox not connected" }}</strong>
-        <small>Connected mailbox</small>
+        <small>{% if config.mailbox_address or config.oauth_account %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
       </span>
     </div>
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
       <span>
-        <strong>Scoring model</strong>
-        <small>Rescores historical alerts on save</small>
+        <strong>{% if config.last_scan_display %}Sync healthy{% else %}Not scanned yet{% endif %}</strong>
+        <small>Last scan {{ config.last_scan_display or "—" }}</small>
       </span>
     </div>
   </div>
   <div class="app-nav-actions">
     <a class="cmd-btn" id="settings-dashboard-btn" href="/dashboard" data-href="/dashboard"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
-    {% if config.oauth_account %}
-      <form method="post" action="/auth/logout">
+    {% if config.oauth_account or config.mailbox_address %}
+      <form method="post" action="/settings/disconnect">
         <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
       </form>
     {% endif %}
@@ -36,6 +36,9 @@
 
 {% if request.query_params.get("saved") %}
   <p class="sync-note">Configuration saved{% if request.query_params.get("rescored") %}; {{ request.query_params.get("rescored") }} historical alerts rescored{% endif %}.</p>
+{% endif %}
+{% if request.query_params.get("disconnected") %}
+  <p class="sync-note">ESET mailbox connection disconnected.</p>
 {% endif %}
 
 <form id="settings-form" class="settings-form clean-settings-form" method="post" action="/settings">
@@ -68,6 +71,11 @@
         <span class="lbl-fixed">Signed-in account</span>
         <input value="{{ config.oauth_account or 'Not connected' }}" readonly>
       </label>
+      {% if config.client_id %}
+      <div class="full-span">
+        <a class="cmd-btn" href="/auth/login"><span class="btn-icon btn-icon-mail" aria-hidden="true"></span>Sign in with Microsoft</a>
+      </div>
+      {% endif %}
     </div>
   </section>
 

@@ -90,6 +90,36 @@ def _escalation_title(row: dict) -> str:
     return f"{severity} Alert: {host}"
 
 
+def _status_keyword(row: dict) -> str:
+    text = " ".join(
+        str(row.get(field) or "")
+        for field in ("containment_status", "resolved_status", "action_taken")
+    ).lower()
+    if not text.strip():
+        return ""
+    keywords = (
+        ("unresolved", ("unresolved", "not resolved")),
+        ("failed", ("failed", "failure", "unable to", "not cleaned", "action required")),
+        ("contained", ("contained", "containment")),
+        ("quarantined", ("quarantined", "quarantine")),
+        ("cleaned", ("cleaned",)),
+        ("deleted", ("deleted", "delete")),
+        ("removed", ("removed", "remove")),
+        ("blocked", ("blocked",)),
+        ("resolved", ("resolved",)),
+        ("terminated", ("terminated",)),
+    )
+    for label, matches in keywords:
+        if any(match in text for match in matches):
+            return label.title()
+    return str(
+        row.get("containment_status")
+        or row.get("resolved_status")
+        or row.get("action_taken")
+        or ""
+    ).strip()
+
+
 def _format_date_short(d: str) -> str:
     try:
         dt = datetime.strptime(d, "%Y-%m-%d")
@@ -215,6 +245,7 @@ def dashboard(request: Request):
     for alert in recent_alerts:
         alert["received_display"] = _format_datetime(alert.get("received_time"))
         alert["score_reasons_list"] = _decode_reasons(alert.get("score_reasons"))
+        alert["status_display"] = _status_keyword(alert)
     teams_messages = list_current_escalation_cases(50, start=view_start, end=view_end)
     for message in teams_messages:
         message["created_display"] = _format_datetime(message.get("created_at"))

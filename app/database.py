@@ -119,6 +119,26 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_acronis_received_time
                 ON acronis_alerts(received_time);
+
+            CREATE TABLE IF NOT EXISTS xymon_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id TEXT,
+                internet_message_id TEXT,
+                received_time TEXT NOT NULL,
+                subject TEXT,
+                sender TEXT,
+                host TEXT,
+                test_name TEXT,
+                status TEXT,
+                message TEXT,
+                age TEXT,
+                group_name TEXT,
+                raw_payload TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_xymon_received_time
+                ON xymon_alerts(received_time);
             """
         )
         # Migrate: add score column to existing databases
@@ -130,8 +150,22 @@ def init_db() -> None:
             "ALTER TABLE alerts ADD COLUMN score_reasons TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE alerts ADD COLUMN escalation_reason TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE alerts ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'containment-v1'",
+            "ALTER TABLE xymon_alerts ADD COLUMN message_id TEXT",
+            "ALTER TABLE xymon_alerts ADD COLUMN internet_message_id TEXT",
+            "ALTER TABLE xymon_alerts ADD COLUMN subject TEXT",
+            "ALTER TABLE xymon_alerts ADD COLUMN sender TEXT",
         ):
             try:
                 conn.execute(column_sql)
             except Exception:
                 pass  # column already exists
+        try:
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_xymon_message_id
+                    ON xymon_alerts(message_id)
+                    WHERE message_id IS NOT NULL AND message_id != ''
+                """
+            )
+        except Exception:
+            pass

@@ -273,12 +273,17 @@ document.addEventListener("DOMContentLoaded", () => {
     form.querySelectorAll("[data-validate]").forEach((input) => {
       if (!validateField(input)) valid = false;
     });
-    const critical = Number(form.elements.namedItem("severity_critical_threshold")?.value || 0);
-    const high = Number(form.elements.namedItem("severity_high_threshold")?.value || 0);
-    const medium = Number(form.elements.namedItem("severity_medium_threshold")?.value || 0);
-    if (!(critical > high && high > medium)) {
-      valid = false;
-      showToast("Severity thresholds must descend: Critical > High > Medium.", "warn");
+    const criticalField = form.elements.namedItem("severity_critical_threshold");
+    const highField = form.elements.namedItem("severity_high_threshold");
+    const mediumField = form.elements.namedItem("severity_medium_threshold");
+    if (criticalField && highField && mediumField) {
+      const critical = Number(criticalField.value || 0);
+      const high = Number(highField.value || 0);
+      const medium = Number(mediumField.value || 0);
+      if (!(critical > high && high > medium)) {
+        valid = false;
+        showToast("Severity thresholds must descend: Critical > High > Medium.", "warn");
+      }
     }
     if (!valid) {
       event.preventDefault();

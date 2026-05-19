@@ -5,9 +5,10 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.models import DEFAULT_TAXONOMY_SCORES
+from app.routes.dashboard import _format_datetime
 from app.scanner import backfill_severity, run_scan
 from app.security import mask_secret
-from app.storage import get_config, save_config
+from app.storage import delete_setting, get_config, get_state, save_config
 
 router = APIRouter(prefix="/settings")
 templates = Jinja2Templates(directory="app/templates")
@@ -21,6 +22,7 @@ def settings_page(request: Request):
     display["teams_webhook_url_masked"] = mask_secret(config.teams_webhook_url)
     display["client_secret"] = ""
     display["teams_webhook_url"] = ""
+    display["last_scan_display"] = _format_datetime(get_state("last_scan_time"))
     return templates.TemplateResponse("settings.html", {"request": request, "config": display})
 
 
@@ -114,6 +116,23 @@ def save_settings(
     )
     rescored = backfill_severity(force=True)
     return RedirectResponse(f"/settings?saved=1&rescored={rescored}", status_code=303)
+
+
+@router.post("/disconnect")
+def disconnect_settings():
+    for key in (
+        "tenant_id",
+        "client_id",
+        "client_secret",
+        "mailbox_address",
+        "mail_folder",
+        "oauth_account",
+        "oauth_token_cache",
+        "oauth_flow",
+    ):
+        delete_setting(key)
+    save_config({"auth_mode": "app"})
+    return RedirectResponse("/settings?disconnected=1", status_code=303)
 
 
 @router.post("/quick")

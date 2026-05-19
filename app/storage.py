@@ -5,7 +5,7 @@ from typing import Any
 
 from app.config import get_app_settings
 from app.database import get_connection
-from app.models import AppConfig, AcronisConfig, ParsedAlert, ParsedAcronisAlert
+from app.models import AppConfig, AcronisConfig, ParsedAlert, ParsedAcronisAlert, ParsedXymonAlert, XymonConfig
 from app.security import SecretStore
 
 SENSITIVE_KEYS = {"client_secret", "teams_webhook_url", "oauth_token_cache", "oauth_flow"}
@@ -104,9 +104,11 @@ def get_acronis_config() -> AcronisConfig:
         client_secret=get_setting("acronis_client_secret"),
         mailbox_address=get_setting("acronis_mailbox_address"),
         mail_folder=get_setting("acronis_mail_folder"),
+        auth_mode=get_setting("acronis_auth_mode") or "delegated",
         sender_filter=get_setting("acronis_sender_filter"),
         subject_filter=get_setting("acronis_subject_filter"),
         lookback_days=int(get_setting("acronis_lookback_days") or "60"),
+        start_date=get_setting("acronis_start_date"),
     )
 
 
@@ -141,25 +143,140 @@ def save_acronis_alert(alert: ParsedAcronisAlert) -> None:
             pass
 
 
-def list_acronis_alerts(limit: int = 200) -> list[dict[str, Any]]:
+def list_acronis_alerts(limit: int = 200, start: str = "", end: str = "") -> list[dict[str, Any]]:
+    conds: list[str] = []
+    params: list[Any] = []
+    if start:
+        conds.append("received_time >= ?")
+        params.append(f"{start}T00:00:00" if len(start) == 10 else start)
+    if end:
+        conds.append("received_time <= ?")
+        params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+    params.append(limit)
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT * FROM acronis_alerts ORDER BY received_time DESC LIMIT ?", (limit,)
+            f"SELECT * FROM acronis_alerts {where} ORDER BY received_time DESC LIMIT ?", params
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def acronis_dashboard_stats() -> dict[str, int]:
+def acronis_dashboard_stats(start: str = "", end: str = "") -> dict[str, int]:
+    conds: list[str] = []
+    params: list[Any] = []
+    if start:
+        conds.append("received_time >= ?")
+        params.append(f"{start}T00:00:00" if len(start) == 10 else start)
+    if end:
+        conds.append("received_time <= ?")
+        params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    date_where = (" AND " + " AND ".join(conds)) if conds else ""
     with get_connection() as conn:
         def _count(where: str) -> int:
             return conn.execute(
-                f"SELECT COUNT(*) AS c FROM acronis_alerts {where}"
+                f"SELECT COUNT(*) AS c FROM acronis_alerts WHERE {where}{date_where}",
+                params,
             ).fetchone()["c"]
         return {
-            "critical": _count("WHERE LOWER(severity) = 'critical'"),
-            "error": _count("WHERE LOWER(severity) = 'error'"),
-            "warning": _count("WHERE LOWER(severity) = 'warning'"),
-            "information": _count("WHERE LOWER(severity) = 'information'"),
+            "critical": _count("LOWER(severity) = 'critical'"),
+            "error": _count("LOWER(severity) = 'error'"),
+            "warning": _count("LOWER(severity) = 'warning'"),
+            "information": _count("LOWER(severity) = 'information'"),
+        }
+
+
+XYMON_SENSITIVE_KEYS = {"xymon_client_secret"}
+
+
+def get_xymon_config() -> XymonConfig:
+    return XymonConfig(
+        tenant_id=get_setting("xymon_tenant_id"),
+        client_id=get_setting("xymon_client_id"),
+        client_secret=get_setting("xymon_client_secret"),
+        mailbox_address=get_setting("xymon_mailbox_address"),
+        mail_folder=get_setting("xymon_mail_folder"),
+        auth_mode=get_setting("xymon_auth_mode") or "delegated",
+        sender_filter=get_setting("xymon_sender_filter"),
+        subject_filter=get_setting("xymon_subject_filter"),
+        host_filter=get_setting("xymon_host_filter"),
+        test_filter=get_setting("xymon_test_filter"),
+        status_filter=get_setting("xymon_status_filter"),
+        lookback_days=int(get_setting("xymon_lookback_days") or "60"),
+        start_date=get_setting("xymon_start_date"),
+        poll_interval_seconds=int(get_setting("xymon_poll_interval_seconds") or "60"),
+    )
+
+
+def save_xymon_config(data: dict) -> None:
+    for key, value in data.items():
+        if not key.startswith("xymon_"):
+            continue
+        if key in XYMON_SENSITIVE_KEYS and not value:
+            continue
+        save_setting(key, str(value), sensitive=(key in XYMON_SENSITIVE_KEYS))
+
+
+def xymon_alert_exists(message_id: str) -> bool:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM xymon_alerts WHERE message_id = ?", (message_id,)
+        ).fetchone()
+    return row is not None
+
+
+def save_xymon_alert(alert: ParsedXymonAlert) -> None:
+    data = alert.as_dict()
+    columns = ", ".join(data.keys())
+    placeholders = ", ".join(["?"] * len(data))
+    with get_connection() as conn:
+        try:
+            conn.execute(
+                f"INSERT INTO xymon_alerts({columns}) VALUES ({placeholders})",
+                tuple(data.values()),
+            )
+        except Exception:
+            pass
+
+
+def list_xymon_alerts(limit: int = 200, start: str = "", end: str = "") -> list[dict[str, Any]]:
+    conds: list[str] = []
+    params: list[Any] = []
+    if start:
+        conds.append("received_time >= ?")
+        params.append(f"{start}T00:00:00" if len(start) == 10 else start)
+    if end:
+        conds.append("received_time <= ?")
+        params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+    params.append(limit)
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM xymon_alerts {where} ORDER BY received_time DESC LIMIT ?", params
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def xymon_dashboard_stats(start: str = "", end: str = "") -> dict[str, int]:
+    conds: list[str] = []
+    params: list[Any] = []
+    if start:
+        conds.append("received_time >= ?")
+        params.append(f"{start}T00:00:00" if len(start) == 10 else start)
+    if end:
+        conds.append("received_time <= ?")
+        params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    date_where = (" AND " + " AND ".join(conds)) if conds else ""
+    with get_connection() as conn:
+        def _count(where: str) -> int:
+            return conn.execute(
+                f"SELECT COUNT(*) AS c FROM xymon_alerts WHERE {where}{date_where}",
+                params,
+            ).fetchone()["c"]
+        return {
+            "red": _count("LOWER(status) = 'red'"),
+            "yellow": _count("LOWER(status) = 'yellow'"),
+            "purple": _count("LOWER(status) = 'purple'"),
+            "green": _count("LOWER(status) = 'green'"),
         }
 
 

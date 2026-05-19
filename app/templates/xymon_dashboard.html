@@ -3,30 +3,30 @@
 
 <header class="app-nav">
   <div class="app-nav-brand-group">
-    <a class="app-nav-brand" href="/acronis" aria-label="Acronis Monitor dashboard">
-      <span class="app-logo app-logo-acronis" aria-hidden="true">A</span>
+    <a class="app-nav-brand" href="/xymon" aria-label="Xymon Monitor dashboard">
+      <span class="app-logo app-logo-xymon" aria-hidden="true">X</span>
       <span>
-        <strong>Acronis Monitor</strong>
-        <small>Backup operations dashboard</small>
+        <strong>Xymon Monitor</strong>
+        <small>Infrastructure status dashboard</small>
       </span>
     </a>
     <div class="dash-switcher">
       <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
-        Acronis <span class="dash-switch-arrow" aria-hidden="true">▾</span>
+        Xymon <span class="dash-switch-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dash-switch-menu" id="dash-switch-menu">
         <a class="dash-switch-opt" href="/dashboard">
           <span class="dsw-icon dsw-icon-eset" aria-hidden="true">E</span>
           <span><strong>ESET Alerts</strong><small>Endpoint security</small></span>
         </a>
-        <a class="dash-switch-opt dash-switch-opt-active" href="/acronis" aria-current="page">
+        <a class="dash-switch-opt" href="/acronis">
           <span class="dsw-icon dsw-icon-acronis" aria-hidden="true">A</span>
           <span><strong>Acronis Backups</strong><small>Backup monitoring</small></span>
-          <span class="dsw-active-check" aria-hidden="true">✓</span>
         </a>
-        <a class="dash-switch-opt" href="/xymon">
+        <a class="dash-switch-opt dash-switch-opt-active" href="/xymon" aria-current="page">
           <span class="dsw-icon dsw-icon-xymon" aria-hidden="true">X</span>
           <span><strong>Xymon Status</strong><small>Infrastructure monitoring</small></span>
+          <span class="dsw-active-check" aria-hidden="true">✓</span>
         </a>
       </div>
     </div>
@@ -35,8 +35,8 @@
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
       <span>
-        <strong>{{ acronis_config.mailbox_address or "Not connected" }}</strong>
-        <small>{% if acronis_config.mailbox_address %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
+        <strong>{{ xymon_config.mailbox_address or "Not connected" }}</strong>
+        <small>{% if xymon_config.mailbox_address %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
       </span>
     </div>
     <div class="nav-status-item">
@@ -51,9 +51,9 @@
     {% if auto_scan_failed %}
       <span class="cmd-badge cmd-badge-warn">Backfill failed</span>
     {% endif %}
-    <a class="cmd-btn" href="/acronis/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
-    {% if acronis_config.mailbox_address %}
-    <form method="post" action="/acronis/settings/disconnect">
+    <a class="cmd-btn" href="/xymon/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
+    {% if xymon_config.mailbox_address %}
+    <form method="post" action="/xymon/settings/disconnect">
       <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
     </form>
     {% endif %}
@@ -63,36 +63,36 @@
 {% if auto_scan_failed %}
 <section class="connection-empty empty-state">
   <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
-  <strong>Acronis mailbox sync needs attention</strong>
+  <strong>Xymon mailbox sync needs attention</strong>
   <small>The last scan could not complete. Check Microsoft Graph settings, mailbox permissions, and folder filters.</small>
-  <a class="empty-action" href="/acronis/settings">Open Configure</a>
+  <a class="empty-action" href="/xymon/settings">Open Configure</a>
 </section>
 {% endif %}
 
-<nav class="range-bar" aria-label="Acronis view range">
+<nav class="range-bar" aria-label="Xymon view range">
   <div class="range-presets">
     {% for preset in range_presets %}
-      <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/acronis?range={{ preset.days }}">{{ preset.short }}</a>
+      <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/xymon?range={{ preset.days }}">{{ preset.short }}</a>
     {% endfor %}
   </div>
 </nav>
 
-<div class="stat-band acr-stat-band">
-  <div class="stat-card acr-critical {% if acronis_stats.critical > 0 %}stat-danger{% endif %}">
-    <span class="stat-val">{{ acronis_stats.critical }}</span>
-    <span class="stat-lbl">Critical</span>
+<div class="stat-band xym-stat-band">
+  <div class="stat-card xym-red {% if xymon_stats.red > 0 %}stat-danger{% endif %}">
+    <span class="stat-val">{{ xymon_stats.red }}</span>
+    <span class="stat-lbl">Red</span>
   </div>
-  <div class="stat-card acr-error {% if acronis_stats.error > 0 %}stat-acr-error{% endif %}">
-    <span class="stat-val">{{ acronis_stats.error }}</span>
-    <span class="stat-lbl">Error</span>
+  <div class="stat-card xym-yellow {% if xymon_stats.yellow > 0 %}stat-warn{% endif %}">
+    <span class="stat-val">{{ xymon_stats.yellow }}</span>
+    <span class="stat-lbl">Yellow</span>
   </div>
-  <div class="stat-card acr-warning {% if acronis_stats.warning > 0 %}stat-warn{% endif %}">
-    <span class="stat-val">{{ acronis_stats.warning }}</span>
-    <span class="stat-lbl">Warning</span>
+  <div class="stat-card xym-purple {% if xymon_stats.purple > 0 %}stat-purple{% endif %}">
+    <span class="stat-val">{{ xymon_stats.purple }}</span>
+    <span class="stat-lbl">Purple</span>
   </div>
-  <div class="stat-card acr-information">
-    <span class="stat-val">{{ acronis_stats.information }}</span>
-    <span class="stat-lbl">Information</span>
+  <div class="stat-card xym-green">
+    <span class="stat-val">{{ xymon_stats.green }}</span>
+    <span class="stat-lbl">Green</span>
   </div>
 </div>
 
@@ -119,7 +119,7 @@
               <div class="empty-state empty-state-table">
                 <span class="empty-illustration" aria-hidden="true"></span>
                 <strong>No alerts in this view</strong>
-                <small>Acronis alert rows will appear here once parsing is enabled.</small>
+                <small>Xymon alert rows will appear here once parsing is enabled.</small>
               </div>
             </td>
           </tr>
@@ -137,7 +137,7 @@
       <div class="empty-state esc-empty">
         <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
         <strong>No escalations in this range</strong>
-        <small>Acronis escalations will appear here once escalation handling is enabled.</small>
+        <small>Xymon escalations will appear here once escalation handling is enabled.</small>
       </div>
     </div>
   </div>

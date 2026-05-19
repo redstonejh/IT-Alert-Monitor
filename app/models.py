@@ -145,6 +145,45 @@ class ParsedAcronisAlert:
 
 
 @dataclass(slots=True)
+class XymonConfig:
+    tenant_id: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    mailbox_address: str = ""
+    mail_folder: str = ""
+    auth_mode: str = "app"
+    sender_filter: str = ""
+    subject_filter: str = ""
+    host_filter: str = ""
+    test_filter: str = ""
+    status_filter: str = ""
+    lookback_days: int = 60
+    start_date: str = ""
+    poll_interval_seconds: int = 60
+
+
+@dataclass(slots=True)
+class ParsedXymonAlert:
+    message_id: str
+    internet_message_id: str
+    received_time: datetime
+    subject: str = ""
+    sender: str = ""
+    host: str = ""
+    test_name: str = ""
+    status: str = ""
+    message: str = ""
+    age: str = ""
+    group_name: str = ""
+    raw_payload: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        data = {field.name: getattr(self, field.name) for field in fields(self)}
+        data["received_time"] = self.received_time.isoformat()
+        return data
+
+
+@dataclass(slots=True)
 class EscalationDecision:
     should_alert: bool
     reason: str

@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
-from app.acronis_scanner import DEFAULT_LOOKBACK_DAYS, run_acronis_scan, run_acronis_scan_range
-from app.storage import acronis_dashboard_stats, get_acronis_config, get_state, list_acronis_alerts
+from app.storage import get_state, get_xymon_config, list_xymon_alerts, xymon_dashboard_stats
+from app.xymon_scanner import DEFAULT_LOOKBACK_DAYS, run_xymon_scan, run_xymon_scan_range
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -70,65 +70,66 @@ def _safe_range_days(value: str) -> int:
     return days if days in allowed else DEFAULT_LOOKBACK_DAYS
 
 
-def _ensure_acronis_scan_coverage(days: int) -> tuple[bool, int]:
+def _ensure_xymon_scan_coverage(days: int) -> tuple[bool, int]:
     desired_start = _range_start(days)
     today = _today_utc().date().isoformat()
-    coverage_start = get_state("acronis_scan_coverage_start")
-    coverage_end = get_state("acronis_scan_coverage_end")
+    coverage_start = get_state("xymon_scan_coverage_start")
+    coverage_end = get_state("xymon_scan_coverage_end")
     processed = 0
     scanned = False
 
     if not coverage_start:
-        result = run_acronis_scan_range(desired_start, today)
+        result = run_xymon_scan_range(desired_start, today)
         return bool(result.get("scan_attempted")), result.get("processed", 0)
 
     if desired_start < coverage_start:
         previous_day = (
             datetime.strptime(coverage_start, "%Y-%m-%d") - timedelta(days=1)
         ).date().isoformat()
-        result = run_acronis_scan_range(desired_start, previous_day)
+        result = run_xymon_scan_range(desired_start, previous_day)
         processed += result.get("processed", 0)
         scanned = scanned or bool(result.get("scan_attempted"))
 
     if not coverage_end or coverage_end < today:
-        result = run_acronis_scan()
+        result = run_xymon_scan()
         processed += result.get("processed", 0)
         scanned = scanned or bool(result.get("scan_attempted"))
 
     return scanned, processed
 
 
-@router.get("/acronis")
-def acronis_dashboard(request: Request):
-    acronis_config = get_acronis_config()
+@router.get("/xymon")
+@router.get("/xymon/")
+def xymon_dashboard(request: Request):
+    xymon_config = get_xymon_config()
     active_days = _safe_range_days(request.query_params.get("range", str(DEFAULT_LOOKBACK_DAYS)))
     view_start = _range_start(active_days)
     view_end = _today_utc().date().isoformat()
     auto_scanned = False
     auto_processed = 0
     auto_scan_failed = False
-    if acronis_config.mailbox_address:
+    if xymon_config.mailbox_address:
         try:
-            auto_scanned, auto_processed = _ensure_acronis_scan_coverage(active_days)
+            auto_scanned, auto_processed = _ensure_xymon_scan_coverage(active_days)
         except Exception:
             auto_scan_failed = True
-    last_scan_display = _format_datetime(get_state("acronis_last_scan_time"))
-    last_scan_error = get_state("acronis_last_scan_error")
-    stats = acronis_dashboard_stats(start=view_start, end=view_end)
-    raw_alerts = list_acronis_alerts(limit=200, start=view_start, end=view_end)
+    last_scan_display = _format_datetime(get_state("xymon_last_scan_time"))
+    last_scan_error = get_state("xymon_last_scan_error")
+    stats = xymon_dashboard_stats(start=view_start, end=view_end)
+    raw_alerts = list_xymon_alerts(limit=200, start=view_start, end=view_end)
     alerts = []
     for row in raw_alerts:
         row["received_display"] = _format_datetime(row.get("received_time"))
         alerts.append(row)
     return templates.TemplateResponse(
-        "acronis_dashboard.html",
+        "xymon_dashboard.html",
         {
             "request": request,
-            "acronis_config": acronis_config,
+            "xymon_config": xymon_config,
             "last_scan_display": last_scan_display,
             "last_scan_error": last_scan_error,
-            "acronis_stats": stats,
-            "acronis_alerts": alerts,
+            "xymon_stats": stats,
+            "xymon_alerts": alerts,
             "active_days": active_days,
             "range_presets": RANGE_PRESETS,
             "view_start": view_start,

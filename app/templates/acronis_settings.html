@@ -13,24 +13,32 @@
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
       <span>
         <strong>{{ config.acronis_mailbox_address or "Not connected" }}</strong>
-        <small>Acronis mailbox</small>
+        <small>{% if config.acronis_mailbox_address %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
       </span>
     </div>
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
       <span>
-        <strong>Acronis settings</strong>
-        <small>Independent from ESET configuration</small>
+        <strong>{% if config.last_scan_display %}Sync healthy{% else %}Not scanned yet{% endif %}</strong>
+        <small>Last scan {{ config.last_scan_display or "—" }}</small>
       </span>
     </div>
   </div>
   <div class="app-nav-actions">
     <a class="cmd-btn" id="settings-dashboard-btn" href="/acronis" data-href="/acronis"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
+    {% if config.acronis_mailbox_address %}
+    <form method="post" action="/acronis/settings/disconnect">
+      <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
+    </form>
+    {% endif %}
   </div>
 </header>
 
 {% if request.query_params.get("saved") %}
   <p class="sync-note">Acronis configuration saved.</p>
+{% endif %}
+{% if request.query_params.get("disconnected") %}
+  <p class="sync-note">Acronis mailbox connection disconnected.</p>
 {% endif %}
 
 <form id="settings-form" class="settings-form clean-settings-form" method="post" action="/acronis/settings">

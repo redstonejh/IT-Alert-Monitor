@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="app-nav settings-nav">
+  <a class="app-nav-brand" href="/xymon" aria-label="Xymon Monitor dashboard">
+    <span class="app-logo app-logo-xymon" aria-hidden="true">X</span>
+    <span>
+      <strong>Configure</strong>
+      <small>Xymon Monitor settings</small>
+    </span>
+  </a>
+  <div class="app-nav-status" aria-label="Configuration status">
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
+      <span>
+        <strong>{{ config.xymon_mailbox_address or "Not connected" }}</strong>
+        <small>{% if config.xymon_mailbox_address %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
+      </span>
+    </div>
+    <div class="nav-status-item">
+      <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
+      <span>
+        <strong>{% if config.last_scan_display %}Sync healthy{% else %}Not scanned yet{% endif %}</strong>
+        <small>Last scan {{ config.last_scan_display or "—" }}</small>
+      </span>
+    </div>
+  </div>
+  <div class="app-nav-actions">
+    <a class="cmd-btn" href="/xymon"><span class="btn-icon btn-icon-dashboard" aria-hidden="true"></span>Dashboard</a>
+    {% if config.xymon_mailbox_address %}
+    <form method="post" action="/xymon/settings/disconnect">
+      <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
+    </form>
+    {% endif %}
+  </div>
+</header>
+
+{% if request.query_params.get("saved") %}
+  <p class="sync-note">Xymon configuration saved.</p>
+{% endif %}
+{% if request.query_params.get("disconnected") %}
+  <p class="sync-note">Xymon source disconnected.</p>
+{% endif %}
+
+<form id="xymon-settings-form" class="settings-form clean-settings-form" method="post" action="/xymon/settings">
+  <section class="form-section">
+    <div class="section-heading">
+      <h2>Xymon mailbox access</h2>
+      <p>Azure App Registration credentials used to read Xymon notification emails. This is independent from ESET and Acronis.</p>
+    </div>
+    <div class="form-grid">
+      <label class="fl-wrap">
+        <input name="xymon_tenant_id" value="{{ config.xymon_tenant_id }}" data-validate="tenant" autocomplete="off" placeholder=" ">
+        <span class="fl-lbl">Tenant ID</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_client_id" value="{{ config.xymon_client_id }}" data-validate="guid" autocomplete="off" placeholder=" ">
+        <span class="fl-lbl">Client ID</span>
+      </label>
+      <label>
+        <span class="lbl-fixed">Client secret</span>
+        <div class="secret-control">
+          <input type="password" name="xymon_client_secret" placeholder="{{ config.xymon_client_secret_masked or 'Required for app credential access' }}" data-secret autocomplete="new-password">
+          <button class="icon-btn secret-toggle" type="button" aria-label="Reveal client secret" title="Reveal">Show</button>
+          <button class="icon-btn secret-copy" type="button" aria-label="Copy client secret" title="Copy">Copy</button>
+        </div>
+        <small class="field-hint">Stored secrets stay masked. Enter a new value only when rotating credentials.</small>
+      </label>
+      <label>
+        <span class="lbl-fixed">Poll interval seconds</span>
+        <input type="number" min="1" name="xymon_poll_interval_seconds" value="{{ config.xymon_poll_interval_seconds }}">
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <div class="section-heading">
+      <h2>Mailbox and filters</h2>
+      <p>The mailbox that receives Xymon notification emails. Blank folder scans every folder.</p>
+    </div>
+    <div class="form-grid">
+      <label class="fl-wrap">
+        <input name="xymon_mailbox_address" value="{{ config.xymon_mailbox_address }}" data-validate="email" placeholder=" ">
+        <span class="fl-lbl">Notifications mailbox</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_mail_folder" value="{{ config.xymon_mail_folder }}" placeholder=" ">
+        <span class="fl-lbl">Folder filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_sender_filter" value="{{ config.xymon_sender_filter }}" placeholder=" ">
+        <span class="fl-lbl">Xymon sender filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_subject_filter" value="{{ config.xymon_subject_filter }}" placeholder=" ">
+        <span class="fl-lbl">Xymon subject filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_host_filter" value="{{ config.xymon_host_filter }}" placeholder=" ">
+        <span class="fl-lbl">Host filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_test_filter" value="{{ config.xymon_test_filter }}" placeholder=" ">
+        <span class="fl-lbl">Test filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="xymon_status_filter" value="{{ config.xymon_status_filter }}" placeholder=" ">
+        <span class="fl-lbl">Status filter</span>
+      </label>
+    </div>
+  </section>
+
+  <div class="sticky-save">
+    <button class="cmd-btn cmd-btn-success" type="submit">
+      <span class="save-spinner" aria-hidden="true"></span>
+      <span class="save-label">Save configuration</span>
+    </button>
+    <span>Xymon settings are saved independently from ESET and Acronis configuration.</span>
+  </div>
+</form>
+{% endblock %}

@@ -2,10 +2,15 @@ import logging
 from copy import copy
 from datetime import datetime, timedelta, timezone
 
-from app.acronis_parser import parse_acronis_message
 from app.database import init_db
 from app.graph_client import GraphClient
-from app.storage import acronis_alert_exists, get_acronis_config, save_acronis_alert, update_state
+from app.storage import (
+    get_xymon_config,
+    save_xymon_alert,
+    update_state,
+    xymon_alert_exists,
+)
+from app.xymon_parser import parse_xymon_message
 
 logger = logging.getLogger(__name__)
 DEFAULT_LOOKBACK_DAYS = 60
@@ -21,25 +26,20 @@ def _merge_coverage(start_date: str, end_date: str | None = None) -> None:
     end = (end_date or _date_text(datetime.now(timezone.utc)))[:10]
     from app.storage import get_state
 
-    current_start = get_state("acronis_scan_coverage_start")
-    current_end = get_state("acronis_scan_coverage_end")
+    current_start = get_state("xymon_scan_coverage_start")
+    current_end = get_state("xymon_scan_coverage_end")
     if not current_start or start < current_start:
-        update_state("acronis_scan_coverage_start", start)
+        update_state("xymon_scan_coverage_start", start)
     if not current_end or end > current_end:
-        update_state("acronis_scan_coverage_end", end)
-
-
-def _configured(config) -> bool:
-    if getattr(config, "auth_mode", "app") == "delegated":
-        return bool(config.client_id and config.mailbox_address)
-    return bool(config.tenant_id and config.client_id and config.client_secret and config.mailbox_address)
+        update_state("xymon_scan_coverage_end", end)
 
 
 def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
+    init_db()
     processed = skipped = parse_failed = 0
     if not PARSING_ENABLED:
-        update_state("acronis_last_scan_time", datetime.now(timezone.utc).isoformat())
-        logger.info("%s Acronis scan complete: parsing disabled", source)
+        update_state("xymon_last_scan_time", datetime.now(timezone.utc).isoformat())
+        logger.info("%s Xymon scan complete: parsing disabled", source)
         return {
             "processed": 0,
             "skipped": len(messages),
@@ -48,21 +48,21 @@ def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
         }
     for message in messages:
         message_id = message.get("id", "")
-        if not message_id or acronis_alert_exists(message_id):
+        if not message_id or xymon_alert_exists(message_id):
             skipped += 1
             continue
         try:
-            alert = parse_acronis_message(message)
+            alert = parse_xymon_message(message)
         except Exception:
             parse_failed += 1
-            logger.exception("Acronis parser failed for message id=%s", message_id)
+            logger.exception("Xymon parser failed for message id=%s", message_id)
             continue
-        save_acronis_alert(alert)
+        save_xymon_alert(alert)
         processed += 1
 
-    update_state("acronis_last_scan_time", datetime.now(timezone.utc).isoformat())
+    update_state("xymon_last_scan_time", datetime.now(timezone.utc).isoformat())
     logger.info(
-        "%s Acronis scan complete: processed=%s skipped=%s parse_failed=%s",
+        "%s Xymon scan complete: processed=%s skipped=%s parse_failed=%s",
         source,
         processed,
         skipped,
@@ -76,38 +76,42 @@ def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
     }
 
 
-def run_acronis_scan() -> dict[str, int]:
-    init_db()
-    config = get_acronis_config()
+def _configured(config) -> bool:
+    if config.auth_mode == "delegated":
+        return bool(config.client_id and config.mailbox_address)
+    return bool(config.tenant_id and config.client_id and config.client_secret and config.mailbox_address)
 
+
+def run_xymon_scan() -> dict[str, int]:
+    init_db()
+    config = get_xymon_config()
     if not _configured(config):
-        logger.info("Acronis scanner: credentials not configured, skipping")
+        logger.info("Xymon scanner: credentials not configured, skipping")
         return {"processed": 0, "skipped": 0, "parse_failed": 0, "scan_attempted": False}
     if not config.lookback_days:
         config.lookback_days = DEFAULT_LOOKBACK_DAYS
 
     client = GraphClient(config)
     try:
-        messages = client.iter_matching_messages()
+        result = _process_messages(client.iter_matching_messages(), "Graph")
     except Exception:
-        logger.exception("Acronis Graph scan failed")
-        update_state("acronis_last_scan_error", "Sign in with Microsoft from ESET Settings to refresh mailbox access.")
+        logger.exception("Xymon Graph scan failed")
+        update_state("xymon_last_scan_error", "Sign in with Microsoft from ESET Settings to refresh mailbox access.")
         return {"processed": 0, "skipped": 0, "parse_failed": 0, "scan_attempted": False}
 
-    result = _process_messages(messages, "Graph")
-    update_state("acronis_last_scan_error", "")
     start = config.start_date[:10] if config.start_date else _date_text(
         datetime.now(timezone.utc) - timedelta(days=config.lookback_days)
     )
     _merge_coverage(start)
+    update_state("xymon_last_scan_error", "")
     return result
 
 
-def run_acronis_scan_range(start_date: str, end_date: str | None = None) -> dict[str, int]:
+def run_xymon_scan_range(start_date: str, end_date: str | None = None) -> dict[str, int]:
     init_db()
-    config = copy(get_acronis_config())
+    config = copy(get_xymon_config())
     if not _configured(config):
-        logger.info("Acronis scanner: credentials not configured, skipping range scan")
+        logger.info("Xymon scanner: credentials not configured, skipping range scan")
         return {"processed": 0, "skipped": 0, "parse_failed": 0, "scan_attempted": False}
     if len(start_date) == 10:
         start_date = start_date + "T00:00:00Z"
@@ -117,8 +121,8 @@ def run_acronis_scan_range(start_date: str, end_date: str | None = None) -> dict
     try:
         messages = client.iter_matching_messages()
     except Exception:
-        logger.exception("Acronis Graph range scan failed")
-        update_state("acronis_last_scan_error", "Sign in with Microsoft from ESET Settings to refresh mailbox access.")
+        logger.exception("Xymon Graph range scan failed")
+        update_state("xymon_last_scan_error", "Sign in with Microsoft from ESET Settings to refresh mailbox access.")
         return {"processed": 0, "skipped": 0, "parse_failed": 0, "scan_attempted": False}
 
     if end_date:
@@ -132,6 +136,6 @@ def run_acronis_scan_range(start_date: str, end_date: str | None = None) -> dict
             ) <= end_dt
         ]
     result = _process_messages(messages, "Graph range")
-    update_state("acronis_last_scan_error", "")
+    update_state("xymon_last_scan_error", "")
     _merge_coverage(start_date, end_date)
     return result

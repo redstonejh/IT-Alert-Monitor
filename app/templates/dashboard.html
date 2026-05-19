@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
+{% set has_dashboard_data = (stats.total | default(0)) > 0 %}
 {% if config.oauth_account %}
 <script>setTimeout(() => location.reload(), 60000);</script>
 {% endif %}
 
-{% if config.oauth_account %}
+{% if config.oauth_account or config.mailbox_address or has_dashboard_data %}
 {# ── CONNECTED DASHBOARD ─────────────────────────────────────────────── #}
 
 <header class="app-nav">
@@ -30,6 +31,10 @@
           <span class="dsw-icon dsw-icon-acronis" aria-hidden="true">A</span>
           <span><strong>Acronis Backups</strong><small>Backup monitoring</small></span>
         </a>
+        <a class="dash-switch-opt" href="/xymon">
+          <span class="dsw-icon dsw-icon-xymon" aria-hidden="true">X</span>
+          <span><strong>Xymon Status</strong><small>Infrastructure monitoring</small></span>
+        </a>
       </div>
     </div>
   </div>
@@ -38,7 +43,7 @@
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
       <span>
         <strong>{{ config.mailbox_address or config.oauth_account }}</strong>
-        <small>Connected mailbox</small>
+        <small>{% if config.mailbox_address or config.oauth_account %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
       </span>
     </div>
     <div class="nav-status-item">
@@ -50,20 +55,20 @@
     </div>
   </div>
   <div class="app-nav-actions">
-    {% if auto_scanned %}
+    {% if auto_scanned and auto_processed > 0 %}
       <span class="cmd-badge">{{ auto_processed }} added</span>
     {% elif stats.last_parse_failed_count %}
       <span class="cmd-badge cmd-badge-warn">{{ stats.last_parse_failed_count }} parse failed</span>
     {% elif auto_scan_failed %}
       <span class="cmd-badge cmd-badge-warn">Backfill failed</span>
-    {% elif request.query_params.get("scanned") %}
+    {% elif request.query_params.get("scanned") and request.query_params.get("scanned") != "0" %}
       <span class="cmd-badge">{{ request.query_params.get("scanned") }} new</span>
     {% elif request.query_params.get("scan_failed") %}
       <span class="cmd-badge cmd-badge-warn">Scan failed</span>
     {% endif %}
     <a class="cmd-btn" href="/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
-    {% if config.oauth_account %}
-    <form method="post" action="/auth/logout">
+    {% if config.oauth_account or config.mailbox_address %}
+    <form method="post" action="/settings/disconnect">
       <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
     </form>
     {% endif %}
@@ -114,15 +119,15 @@
     <span class="stat-val">{{ stats.total }}</span>
     <span class="stat-lbl">Total alerts</span>
   </a>
-  <a class="stat-card {% if stats.critical > 0 %}stat-danger{% endif %} {% if active_metric == 'critical' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=critical">
+  <a class="stat-card {% if active_metric == 'critical' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=critical">
     <span class="stat-val">{{ stats.critical }}</span>
     <span class="stat-lbl">Critical clients</span>
   </a>
-  <a class="stat-card {% if stats.repeated > 0 %}stat-warn{% endif %} {% if active_metric == 'repeated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=repeated">
+  <a class="stat-card {% if active_metric == 'repeated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=repeated">
     <span class="stat-val">{{ stats.repeated }}</span>
     <span class="stat-lbl">Repeated threats</span>
   </a>
-  <a class="stat-card {% if stats.failed > 0 %}stat-warn{% endif %} {% if active_metric == 'unresolved' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=unresolved">
+  <a class="stat-card {% if active_metric == 'unresolved' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=unresolved">
     <span class="stat-val">{{ stats.failed }}</span>
     <span class="stat-lbl">Unresolved</span>
   </a>
@@ -135,7 +140,7 @@
 <div class="db-grid">
 
   <div class="db-panel">
-    <div class="db-panel-hd">
+    <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">{{ metric_label }}</span>
       <span class="db-panel-count">{{ recent_alerts | length }}</span>
     </div>
@@ -170,7 +175,7 @@
                 data-reasons='{{ (a.score_reasons_list or []) | tojson }}'
               >{{ a.severity or "Unknown" }}</button>
             </td>
-            <td class="al-status">{{ a.containment_status or a.resolved_status or a.action_taken or "—" }}</td>
+            <td class="al-status">{{ a.status_display or "—" }}</td>
           </tr>
           {% else %}
           <tr>
@@ -190,11 +195,11 @@
   </div>
 
   <div class="db-panel">
-    <div class="db-panel-hd">
+    <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">{{ teams_messages | length }}</span>
     </div>
-    <div class="db-panel-body esc-feed esc-timeline">
+    <div class="db-panel-body esc-feed {% if teams_messages %}esc-timeline{% else %}esc-timeline-empty{% endif %}">
       {% for msg in teams_messages %}
       <a class="esc-card" href="/alerts/{{ msg.alert_id or msg.id }}">
         <span class="timeline-dot" aria-hidden="true"></span>
