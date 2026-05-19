@@ -45,9 +45,18 @@
       <p>These IDs come from the Azure App Registration used for Microsoft sign-in.</p>
     </div>
     <div class="form-grid">
-      <label>Tenant ID<input name="tenant_id" value="{{ config.tenant_id }}" data-validate="tenant" autocomplete="off"><small class="field-error"></small></label>
-      <label>Client ID<input name="client_id" value="{{ config.client_id }}" data-validate="guid" autocomplete="off"><small class="field-error"></small></label>
-      <label>Client secret
+      <label class="fl-wrap">
+        <input name="tenant_id" value="{{ config.tenant_id }}" data-validate="tenant" autocomplete="off" placeholder=" ">
+        <span class="fl-lbl">Tenant ID</span>
+        <small class="field-error"></small>
+      </label>
+      <label class="fl-wrap">
+        <input name="client_id" value="{{ config.client_id }}" data-validate="guid" autocomplete="off" placeholder=" ">
+        <span class="fl-lbl">Client ID</span>
+        <small class="field-error"></small>
+      </label>
+      <label>
+        <span class="lbl-fixed">Client secret</span>
         <div class="secret-control">
           <input type="password" name="client_secret" placeholder="{{ config.client_secret_masked or 'Optional for delegated sign-in' }}" data-secret autocomplete="new-password">
           <button class="icon-btn secret-toggle" type="button" aria-label="Reveal client secret" title="Reveal">Show</button>
@@ -55,7 +64,10 @@
         </div>
         <small class="field-hint">Stored secrets stay masked. Enter a new value only when rotating credentials.</small>
       </label>
-      <label>Signed-in account<input value="{{ config.oauth_account or 'Not connected' }}" readonly></label>
+      <label class="fl-wrap">
+        <input value="{{ config.oauth_account or 'Not connected' }}" readonly placeholder=" ">
+        <span class="fl-lbl">Signed-in account</span>
+      </label>
     </div>
   </section>
 
@@ -65,10 +77,23 @@
       <p>Blank folder scans every folder. Subject and sender filters keep the parser focused on ESET notifications.</p>
     </div>
     <div class="form-grid">
-      <label>Notifications mailbox<input name="mailbox_address" value="{{ config.mailbox_address }}" placeholder="Blank uses signed-in mailbox" data-validate="email"><small class="field-error"></small></label>
-      <label>Folder filter<input name="mail_folder" value="{{ config.mail_folder }}" placeholder="Blank scans every folder"></label>
-      <label>ESET sender filter<input name="eset_sender_filter" value="{{ config.eset_sender_filter }}" placeholder="report@protect.eset.com"></label>
-      <label>ESET subject filter<input name="eset_subject_filter" value="{{ config.eset_subject_filter }}" placeholder="ESET"></label>
+      <label class="fl-wrap">
+        <input name="mailbox_address" value="{{ config.mailbox_address }}" data-validate="email" placeholder=" ">
+        <span class="fl-lbl">Notifications mailbox</span>
+        <small class="field-error"></small>
+      </label>
+      <label class="fl-wrap">
+        <input name="mail_folder" value="{{ config.mail_folder }}" placeholder=" ">
+        <span class="fl-lbl">Folder filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="eset_sender_filter" value="{{ config.eset_sender_filter }}" placeholder=" ">
+        <span class="fl-lbl">ESET sender filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="eset_subject_filter" value="{{ config.eset_subject_filter }}" placeholder=" ">
+        <span class="fl-lbl">ESET subject filter</span>
+      </label>
     </div>
   </section>
 
@@ -78,7 +103,8 @@
       <p>Escalations are limited to the first Critical alert per client per rolling 24 hours.</p>
     </div>
     <div class="form-grid">
-      <label class="full-span">Teams webhook URL
+      <label class="full-span">
+        <span class="lbl-fixed">Teams webhook URL</span>
         <div class="secret-control">
           <input type="password" name="teams_webhook_url" placeholder="{{ config.teams_webhook_url_masked or 'Paste Teams Workflow / Incoming Webhook URL' }}" data-secret data-validate="teams-webhook" autocomplete="off">
           <button class="icon-btn secret-toggle" type="button" aria-label="Reveal Teams webhook URL" title="Reveal">Show</button>
@@ -86,7 +112,10 @@
         </div>
         <small class="field-error"></small>
       </label>
-      <label>Escalation cooldown hours<input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}"></label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}" placeholder=" ">
+        <span class="fl-lbl">Escalation cooldown hours</span>
+      </label>
       <label class="switch-row full-span">
         <input type="checkbox" name="teams_dry_run" {% if config.teams_dry_run %}checked{% endif %}>
         <span>
@@ -120,43 +149,116 @@
           <small>Enabled by default to preserve the original dashboard severity model. Turn off only when every threat name should start from the same base score.</small>
         </span>
       </label>
-      <label class="full-span">Taxonomy base scores
+      <label class="full-span">
+        <span class="lbl-fixed">Taxonomy base scores</span>
         <textarea name="taxonomy_scores" rows="11" spellcheck="false">{{ config.taxonomy_scores }}</textarea>
       </label>
 
       <div class="score-group-title full-span">Severity buckets</div>
-      <label>Unknown threat base score<input type="number" min="0" max="100" name="unknown_base_score" value="{{ config.unknown_base_score }}"></label>
-      <label>Critical threshold<input type="number" min="0" max="100" name="severity_critical_threshold" value="{{ config.severity_critical_threshold }}"></label>
-      <label>High threshold<input type="number" min="0" max="100" name="severity_high_threshold" value="{{ config.severity_high_threshold }}"></label>
-      <label>Medium threshold<input type="number" min="0" max="100" name="severity_medium_threshold" value="{{ config.severity_medium_threshold }}"></label>
+      <label class="fl-wrap">
+        <input type="number" min="0" max="100" name="unknown_base_score" value="{{ config.unknown_base_score }}" placeholder=" ">
+        <span class="fl-lbl">Unknown threat base score</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="0" max="100" name="severity_critical_threshold" value="{{ config.severity_critical_threshold }}" placeholder=" ">
+        <span class="fl-lbl">Critical threshold</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="0" max="100" name="severity_high_threshold" value="{{ config.severity_high_threshold }}" placeholder=" ">
+        <span class="fl-lbl">High threshold</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="0" max="100" name="severity_medium_threshold" value="{{ config.severity_medium_threshold }}" placeholder=" ">
+        <span class="fl-lbl">Medium threshold</span>
+      </label>
 
       <div class="score-group-title full-span">Same host, same threat repetition</div>
-      <label>Repeat window hours<input type="number" min="1" name="repeated_same_host_window_hours" value="{{ config.repeated_same_host_window_hours }}"></label>
-      <label>Repeat once adjustment<input type="number" name="repeated_same_host_1_adjustment" value="{{ config.repeated_same_host_1_adjustment }}"></label>
-      <label>Repeat twice adjustment<input type="number" name="repeated_same_host_2_adjustment" value="{{ config.repeated_same_host_2_adjustment }}"></label>
-      <label>Repeat 3+ adjustment<input type="number" name="repeated_same_host_3_adjustment" value="{{ config.repeated_same_host_3_adjustment }}"></label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="repeated_same_host_window_hours" value="{{ config.repeated_same_host_window_hours }}" placeholder=" ">
+        <span class="fl-lbl">Repeat window hours</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="repeated_same_host_1_adjustment" value="{{ config.repeated_same_host_1_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Repeat once adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="repeated_same_host_2_adjustment" value="{{ config.repeated_same_host_2_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Repeat twice adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="repeated_same_host_3_adjustment" value="{{ config.repeated_same_host_3_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Repeat 3+ adjustment</span>
+      </label>
 
       <div class="score-group-title full-span">Same threat across endpoints</div>
-      <label>Campaign window hours<input type="number" min="1" name="campaign_endpoint_window_hours" value="{{ config.campaign_endpoint_window_hours }}"></label>
-      <label>2 endpoints adjustment<input type="number" name="campaign_endpoint_2_adjustment" value="{{ config.campaign_endpoint_2_adjustment }}"></label>
-      <label>3 endpoints adjustment<input type="number" name="campaign_endpoint_3_adjustment" value="{{ config.campaign_endpoint_3_adjustment }}"></label>
-      <label>5 endpoints adjustment<input type="number" name="campaign_endpoint_5_adjustment" value="{{ config.campaign_endpoint_5_adjustment }}"></label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="campaign_endpoint_window_hours" value="{{ config.campaign_endpoint_window_hours }}" placeholder=" ">
+        <span class="fl-lbl">Campaign window hours</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="campaign_endpoint_2_adjustment" value="{{ config.campaign_endpoint_2_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">2 endpoints adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="campaign_endpoint_3_adjustment" value="{{ config.campaign_endpoint_3_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">3 endpoints adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="campaign_endpoint_5_adjustment" value="{{ config.campaign_endpoint_5_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">5 endpoints adjustment</span>
+      </label>
 
       <div class="score-group-title full-span">Persistence and velocity</div>
-      <label>2-day persistence adjustment<input type="number" name="persistence_2_day_adjustment" value="{{ config.persistence_2_day_adjustment }}"></label>
-      <label>4-day persistence adjustment<input type="number" name="persistence_4_day_adjustment" value="{{ config.persistence_4_day_adjustment }}"></label>
-      <label>Velocity window hours<input type="number" min="1" name="velocity_window_hours" value="{{ config.velocity_window_hours }}"></label>
-      <label>Velocity baseline days<input type="number" min="1" name="velocity_baseline_days" value="{{ config.velocity_baseline_days }}"></label>
-      <label>Velocity multiplier<input type="number" min="1" name="velocity_multiplier" value="{{ config.velocity_multiplier }}"></label>
-      <label>Velocity minimum count<input type="number" min="1" name="velocity_min_count" value="{{ config.velocity_min_count }}"></label>
-      <label>Velocity adjustment<input type="number" name="velocity_adjustment" value="{{ config.velocity_adjustment }}"></label>
+      <label class="fl-wrap">
+        <input type="number" name="persistence_2_day_adjustment" value="{{ config.persistence_2_day_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">2-day persistence adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="persistence_4_day_adjustment" value="{{ config.persistence_4_day_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">4-day persistence adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="velocity_window_hours" value="{{ config.velocity_window_hours }}" placeholder=" ">
+        <span class="fl-lbl">Velocity window hours</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="velocity_baseline_days" value="{{ config.velocity_baseline_days }}" placeholder=" ">
+        <span class="fl-lbl">Velocity baseline days</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="velocity_multiplier" value="{{ config.velocity_multiplier }}" placeholder=" ">
+        <span class="fl-lbl">Velocity multiplier</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="velocity_min_count" value="{{ config.velocity_min_count }}" placeholder=" ">
+        <span class="fl-lbl">Velocity minimum count</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="velocity_adjustment" value="{{ config.velocity_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Velocity adjustment</span>
+      </label>
 
       <div class="score-group-title full-span">Host volume and remediation outcome</div>
-      <label>Host alert window hours<input type="number" min="1" name="host_alert_window_hours" value="{{ config.host_alert_window_hours }}"></label>
-      <label>Host alert threshold<input type="number" min="1" name="host_alert_count_threshold" value="{{ config.host_alert_count_threshold }}"></label>
-      <label>Host alert adjustment<input type="number" name="host_alert_adjustment" value="{{ config.host_alert_adjustment }}"></label>
-      <label>Failure/unresolved adjustment<input type="number" name="failure_adjustment" value="{{ config.failure_adjustment }}"></label>
-      <label>Successful containment adjustment<input type="number" name="success_adjustment" value="{{ config.success_adjustment }}"></label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="host_alert_window_hours" value="{{ config.host_alert_window_hours }}" placeholder=" ">
+        <span class="fl-lbl">Host alert window hours</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="host_alert_count_threshold" value="{{ config.host_alert_count_threshold }}" placeholder=" ">
+        <span class="fl-lbl">Host alert threshold</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="host_alert_adjustment" value="{{ config.host_alert_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Host alert adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="failure_adjustment" value="{{ config.failure_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Failure/unresolved adjustment</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="success_adjustment" value="{{ config.success_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Successful containment adjustment</span>
+      </label>
     </div>
 
     <div class="score-preview">
@@ -165,11 +267,26 @@
         <span>Try a detection before saving.</span>
       </div>
       <div class="form-grid">
-        <label>Threat name<input id="preview-threat" value="Win32/TestThreat"></label>
-        <label>Hostname<input id="preview-host" value="TEST-ENDPOINT-01"></label>
-        <label>Action taken<input id="preview-action" value="Remediation failed"></label>
-        <label>Containment status<input id="preview-containment" value="Failed"></label>
-        <label>Resolved status<input id="preview-resolved" value="Unresolved"></label>
+        <label class="fl-wrap">
+          <input id="preview-threat" value="Win32/TestThreat" placeholder=" ">
+          <span class="fl-lbl">Threat name</span>
+        </label>
+        <label class="fl-wrap">
+          <input id="preview-host" value="TEST-ENDPOINT-01" placeholder=" ">
+          <span class="fl-lbl">Hostname</span>
+        </label>
+        <label class="fl-wrap">
+          <input id="preview-action" value="Remediation failed" placeholder=" ">
+          <span class="fl-lbl">Action taken</span>
+        </label>
+        <label class="fl-wrap">
+          <input id="preview-containment" value="Failed" placeholder=" ">
+          <span class="fl-lbl">Containment status</span>
+        </label>
+        <label class="fl-wrap">
+          <input id="preview-resolved" value="Unresolved" placeholder=" ">
+          <span class="fl-lbl">Resolved status</span>
+        </label>
         <button class="cmd-btn" id="score-preview-btn" type="button">Calculate score</button>
       </div>
       <div class="preview-result" id="score-preview-result">Preview has not run yet.</div>

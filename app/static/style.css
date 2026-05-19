@@ -864,6 +864,67 @@ pre {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
 }
 
+/* ── Floating-label input within form-grid ─────────────────────── */
+.form-grid label.fl-wrap {
+  display: block;
+  position: relative;
+}
+
+.form-grid label.fl-wrap > input,
+.form-grid label.fl-wrap > select {
+  height: 54px;
+  padding: 22px 13px 6px;
+}
+
+.form-grid label.fl-wrap > input[readonly] {
+  background: var(--surface-soft);
+  color: var(--muted-strong);
+  cursor: default;
+}
+
+.fl-lbl {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 540;
+  pointer-events: none;
+  line-height: 1;
+  transition: top .14s ease, transform .14s ease, color .14s ease, font-size .14s ease;
+}
+
+.form-grid label.fl-wrap > input:focus ~ .fl-lbl,
+.form-grid label.fl-wrap > input:not(:placeholder-shown) ~ .fl-lbl {
+  top: 8px;
+  transform: none;
+  font-size: 11px;
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.form-grid label.fl-wrap > input:not(:placeholder-shown):not(:focus) ~ .fl-lbl {
+  color: var(--muted-strong);
+}
+
+.form-grid label.fl-wrap > input[readonly] ~ .fl-lbl {
+  top: 8px;
+  transform: none;
+  font-size: 11px;
+  color: var(--muted-strong);
+  font-weight: 700;
+}
+
+/* Fixed-style label for fields that can't use floating (secret-control, textarea) */
+.lbl-fixed {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-strong);
+  font-size: 13px;
+  font-weight: 680;
+}
+
 .logic-card {
   display: grid;
   gap: 7px;

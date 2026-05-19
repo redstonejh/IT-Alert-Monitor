@@ -40,9 +40,18 @@
       <p>Azure App Registration credentials used to read the Acronis notifications mailbox. Completely separate from the ESET connection.</p>
     </div>
     <div class="form-grid">
-      <label>Tenant ID<input name="acronis_tenant_id" value="{{ config.acronis_tenant_id }}" data-validate="tenant" autocomplete="off"><small class="field-error"></small></label>
-      <label>Client ID<input name="acronis_client_id" value="{{ config.acronis_client_id }}" data-validate="guid" autocomplete="off"><small class="field-error"></small></label>
-      <label>Client secret
+      <label class="fl-wrap">
+        <input name="acronis_tenant_id" value="{{ config.acronis_tenant_id }}" data-validate="tenant" autocomplete="off" placeholder=" ">
+        <span class="fl-lbl">Tenant ID</span>
+        <small class="field-error"></small>
+      </label>
+      <label class="fl-wrap">
+        <input name="acronis_client_id" value="{{ config.acronis_client_id }}" data-validate="guid" autocomplete="off" placeholder=" ">
+        <span class="fl-lbl">Client ID</span>
+        <small class="field-error"></small>
+      </label>
+      <label>
+        <span class="lbl-fixed">Client secret</span>
         <div class="secret-control">
           <input type="password" name="acronis_client_secret" placeholder="{{ config.acronis_client_secret_masked or 'Required for app credential access' }}" data-secret autocomplete="new-password">
           <button class="icon-btn secret-toggle" type="button" aria-label="Reveal client secret" title="Reveal">Show</button>
@@ -59,10 +68,23 @@
       <p>The mailbox that receives Acronis Cyber Protect Cloud email notifications. Blank folder scans every folder.</p>
     </div>
     <div class="form-grid">
-      <label>Notifications mailbox<input name="acronis_mailbox_address" value="{{ config.acronis_mailbox_address }}" placeholder="acronis-alerts@yourdomain.com" data-validate="email"><small class="field-error"></small></label>
-      <label>Folder filter<input name="acronis_mail_folder" value="{{ config.acronis_mail_folder }}" placeholder="Blank scans every folder"></label>
-      <label>Acronis sender filter<input name="acronis_sender_filter" value="{{ config.acronis_sender_filter }}" placeholder="noreply@acronis.com"></label>
-      <label>Acronis subject filter<input name="acronis_subject_filter" value="{{ config.acronis_subject_filter }}" placeholder="Acronis"></label>
+      <label class="fl-wrap">
+        <input name="acronis_mailbox_address" value="{{ config.acronis_mailbox_address }}" data-validate="email" placeholder=" ">
+        <span class="fl-lbl">Notifications mailbox</span>
+        <small class="field-error"></small>
+      </label>
+      <label class="fl-wrap">
+        <input name="acronis_mail_folder" value="{{ config.acronis_mail_folder }}" placeholder=" ">
+        <span class="fl-lbl">Folder filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="acronis_sender_filter" value="{{ config.acronis_sender_filter }}" placeholder=" ">
+        <span class="fl-lbl">Acronis sender filter</span>
+      </label>
+      <label class="fl-wrap">
+        <input name="acronis_subject_filter" value="{{ config.acronis_subject_filter }}" placeholder=" ">
+        <span class="fl-lbl">Acronis subject filter</span>
+      </label>
     </div>
   </section>
 
@@ -72,7 +94,8 @@
       <p>Shared with ESET monitor. Escalations are capped per client by the configured cooldown.</p>
     </div>
     <div class="form-grid">
-      <label class="full-span">Teams webhook URL
+      <label class="full-span">
+        <span class="lbl-fixed">Teams webhook URL</span>
         <div class="secret-control">
           <input type="password" name="teams_webhook_url" placeholder="{{ config.teams_webhook_url_masked or 'Paste Teams Workflow / Incoming Webhook URL' }}" data-secret data-validate="teams-webhook" autocomplete="off">
           <button class="icon-btn secret-toggle" type="button" aria-label="Reveal Teams webhook URL" title="Reveal">Show</button>
@@ -80,7 +103,10 @@
         </div>
         <small class="field-error"></small>
       </label>
-      <label>Escalation cooldown hours<input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}"></label>
+      <label class="fl-wrap">
+        <input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}" placeholder=" ">
+        <span class="fl-lbl">Escalation cooldown hours</span>
+      </label>
       <label class="switch-row full-span">
         <input type="checkbox" name="teams_dry_run" {% if config.teams_dry_run %}checked{% endif %}>
         <span>
@@ -97,7 +123,8 @@
       <p>Map Acronis alert types to base scores. One entry per line: <code>Alert Type = score</code>. Independent from ESET taxonomy.</p>
     </div>
     <div class="form-grid scoring-grid">
-      <label class="full-span">Acronis taxonomy scores
+      <label class="full-span">
+        <span class="lbl-fixed">Acronis taxonomy scores</span>
         <textarea name="acronis_taxonomy_scores" rows="11" spellcheck="false">{{ config.acronis_taxonomy_scores }}</textarea>
       </label>
     </div>
