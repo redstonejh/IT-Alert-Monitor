@@ -825,7 +825,7 @@ pre {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  align-items: end;
+  align-items: start;
 }
 
 .form-grid label {
@@ -2694,21 +2694,29 @@ pre {
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--surface-soft);
+  background: #fff;
   color: var(--muted-strong);
   cursor: pointer;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
   outline: 0;
-  transition: background .14s ease, border-color .14s ease, color .14s ease, box-shadow .14s ease;
+  transition: background .14s ease, border-color .14s ease, color .14s ease;
 }
 
 .icon-btn:hover {
-  border-color: var(--line);
-  background: #eef1f6;
+  border-color: #b0bdd0;
+  background: #f1f5f9;
   color: var(--ink-strong);
   box-shadow: none;
+}
+
+.icon-btn:focus,
+.icon-btn:active {
+  outline: none;
+  box-shadow: none;
+  background: #fff;
+  border-color: var(--line);
 }
 
 .secret-control .icon-btn::before {
@@ -2717,8 +2725,8 @@ pre {
 }
 
 .secret-toggle.revealed {
-  border-color: var(--line);
-  background: #eef1f6;
+  border-color: #b0bdd0;
+  background: #f1f5f9;
   color: var(--muted-strong);
 }
 

@@ -103,9 +103,9 @@
         </div>
         <small class="field-error"></small>
       </label>
-      <label class="fl-wrap">
-        <input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}" placeholder=" ">
-        <span class="fl-lbl">Escalation cooldown hours</span>
+      <label>
+        <span class="lbl-fixed">Escalation cooldown hours</span>
+        <input type="number" min="1" name="escalation_cooldown_hours" value="{{ config.escalation_cooldown_hours }}">
       </label>
       <label class="switch-row full-span">
         <input type="checkbox" name="teams_dry_run" {% if config.teams_dry_run %}checked{% endif %}>
