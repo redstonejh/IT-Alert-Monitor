@@ -1,16 +1,18 @@
-# ESET & Acronis Alert Monitor
+# IT Alert Monitor
 
-A local FastAPI operations portal that monitors both ESET endpoint security email notifications and Acronis Cyber Protect Cloud backup alerts from a shared Microsoft 365 mailbox. It scores endpoint risk, preserves historical alert context, and sends controlled Microsoft Teams escalations.
+A local FastAPI operations portal that monitors ESET endpoint security email notifications, Acronis Cyber Protect Cloud backup alerts, and Xymon infrastructure notifications from Microsoft 365 mailboxes. It scores endpoint risk, preserves historical alert context, and sends controlled Microsoft Teams escalations.
 
-The project is designed for teams that receive ESET and Acronis notifications by email and need a lightweight way to turn those messages into searchable alert history, client-aware severity scoring, and low-noise Teams notifications.
+The project is designed for teams that receive operational notifications by email and need a lightweight way to turn those messages into searchable alert history, client-aware severity scoring, and low-noise Teams notifications.
 
 ---
 
 ## What It Does
 
-The monitor connects to a Microsoft 365 mailbox through Microsoft Graph, reads matching notification emails, extracts alert fields, stores historical events in SQLite, and evaluates each ESET alert against a configurable severity and escalation model.
+The monitor connects to Microsoft 365 mailboxes through Microsoft Graph, reads matching notification emails, stores historical events in SQLite, and evaluates ESET alerts against a configurable severity and escalation model.
 
 It focuses on reducing Teams noise. Alerts are recorded historically, but Teams escalation is intentionally gated so the channel receives only meaningful Critical events, capped to the first Critical alert per client in a rolling 24-hour window.
+
+Acronis and Xymon dashboards currently provide the same mailbox connection, range backfill, sync status, and blank Alerts/Escalations layout as ESET, but parsing/storage for those email bodies is intentionally disabled until real notification samples are available.
 
 ---
 
@@ -21,11 +23,12 @@ It focuses on reducing Teams noise. Alerts are recorded historically, but Teams 
 - Recursive folder scanning when no folder filter is configured
 - Historical backfill with dashboard presets from Today through 1 year
 - SQLite-backed alert, event, scan, and escalation history
-- Separate ESET and Acronis dashboards with a shared switcher
+- Separate ESET, Acronis, and Xymon dashboards with a shared switcher
 - Configurable ESET sender and subject filters
 - Configurable Acronis sender and subject filters (stored independently)
+- Configurable Xymon sender and subject filters (stored independently)
 - ESET alert body parsing for hostname, user, threat, severity, action, status, IP, OS, and raw email body
-- Acronis alert parsing for device, plan, group, account, and severity
+- Acronis and Xymon mailbox sync shells with parsing disabled until sample emails are available
 - Configurable severity scoring model with taxonomy base scores plus recurrence, spread, persistence, velocity, host volume, and remediation outcome
 - JSON API endpoints for dashboard, alert detail, settings, and scoring preview
 - Dashboard metric filters for total alerts, Critical clients, repeated threats, unresolved cases, and escalations
@@ -46,10 +49,10 @@ Microsoft 365 mailbox
 Microsoft Graph API
         |
         v
-  ESET parser       Acronis parser
-        |                  |
-        v                  v
-      SQLite history store
+  ESET parser       Acronis sync shell       Xymon sync shell
+        |                  |                       |
+        v                  v                       v
+              SQLite history store
               |
               v
    Severity scoring + escalation policy
@@ -63,12 +66,15 @@ Main modules:
 - `app/main.py` — starts FastAPI, mounts routes and static assets, runs the polling loop
 - `app/graph_client.py` — authenticates with Microsoft Graph and reads mailbox messages
 - `app/parser.py` — extracts structured ESET fields from email bodies
+- `app/acronis_scanner.py` — scans the Acronis mailbox, tracks coverage, and currently skips parsing
+- `app/xymon_scanner.py` — scans the Xymon mailbox, tracks coverage, and currently skips parsing
+- `app/xymon_parser.py` — parser scaffold for future Xymon notification samples
 - `app/scoring.py` — computes configurable 0–100 severity scores
 - `app/rules.py` — applies Teams escalation throttling
 - `app/storage.py` — stores configuration, alerts, events, and state in SQLite
 - `app/security.py` — encrypts stored secrets with a local Fernet key
 - `app/teams_notifier.py` — posts Teams webhook payloads
-- `app/scanner.py` — runs mailbox scans from the web app or CLI
+- `app/scanner.py` — runs ESET mailbox scans from the web app or CLI
 
 ---
 
@@ -301,16 +307,28 @@ Non-escalated alerts are still stored in SQLite and visible on the dashboard. Th
 
 ## Acronis Monitor
 
-The Acronis dashboard (`/acronis`) connects to the same Microsoft 365 mailbox and displays Acronis Cyber Protect Cloud backup alerts parsed from email notifications. It has its own configuration page (`/acronis/settings`) with independent sender/subject filters and a separate taxonomy textarea. Azure credentials, the mailbox address, and the Teams webhook are shared between both monitors.
+The Acronis dashboard (`/acronis`) connects to a Microsoft 365 mailbox and uses the same date preset/backfill behavior as ESET. It has its own configuration page (`/acronis/settings`) with independent mailbox, folder, sender, and subject filters.
 
-Acronis alert severity categories (Critical, Error, Warning, Information) come directly from Acronis notification content rather than the ESET scoring engine.
+The dashboard currently shows the same ESET-style Alerts and Escalations panel structure, but Acronis parsing is disabled until real notification samples are available. The sync layer still validates mailbox access, scans configured ranges, records last-scan state, and polls in the background.
+
+When parsing is enabled later, Acronis alert severity categories (Critical, Error, Warning, Information) should come directly from Acronis notification content rather than the ESET scoring engine.
+
+---
+
+## Xymon Monitor
+
+The Xymon dashboard (`/xymon`) connects to a Microsoft 365 mailbox and uses the same date preset/backfill behavior as ESET. It has its own configuration page (`/xymon/settings`) with independent mailbox, folder, sender, subject, host, test, and status filters.
+
+The dashboard currently shows the same ESET-style Alerts and Escalations panel structure, but Xymon parsing is disabled until real notification samples are available. The sync layer still validates mailbox access, scans configured ranges, records last-scan state, and polls in the background.
+
+`app/xymon_parser.py` is present as a scaffold for future Xymon email parsing once sample messages are available.
 
 ---
 
 ## Requirements
 
 - Python 3.11 or newer recommended
-- Microsoft 365 mailbox that receives ESET and/or Acronis alert emails
+- Microsoft 365 mailbox that receives ESET, Acronis, and/or Xymon alert emails
 - Azure App Registration with Microsoft Graph permissions
 - Optional Microsoft Teams Incoming Webhook or Teams Workflow webhook
 
@@ -388,7 +406,7 @@ This application does not use basic Outlook username/password authentication.
 
 ### Microsoft Sign-In
 
-Use this for local testing or when a user account has access to the notifications mailbox.
+Use this for local testing or when a user account has access to the notifications mailbox. ESET, Acronis, and Xymon can all use the same signed-in Microsoft token cache when their monitor-specific auth mode is delegated.
 
 1. Open the dashboard.
 2. Enter the Tenant ID and Client ID.
@@ -398,11 +416,15 @@ Use this for local testing or when a user account has access to the notification
 
 After sign-in, the dashboard scans automatically.
 
+If the app shows a mailbox as connected but Acronis or Xymon reports that Microsoft sign-in is needed, open ESET Configure (`/settings`) and use **Sign in with Microsoft** in the Microsoft Graph section to recreate the local OAuth token cache.
+
 ### App Credentials
 
 Use this for unattended production polling. Configure Tenant ID, Client ID, Client Secret, and mailbox address through the Configure page or `.env`.
 
 For shared mailboxes, the app registration must be allowed to read that mailbox. In production environments, consider using an Exchange application access policy to scope Graph access to only the mailbox or mail-enabled security group required by this app.
+
+If Acronis or Xymon is switched to app-credential access and Graph returns `403 Forbidden` while reading `/users/<mailbox>/mailFolders`, the saved IDs and secret may be valid but the Azure app identity is not authorized to read that mailbox. Add Microsoft Graph application permission `Mail.Read`, grant admin consent, and check any Exchange Application Access Policy.
 
 ---
 
@@ -461,7 +483,16 @@ The ESET dashboard provides:
 The Acronis dashboard provides:
 
 - Critical / Error / Warning / Information counts
-- Backup alert table with device, plan, group, account, and severity
+- Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr
+- Mailbox sync status and scan coverage tracking
+- Blank ESET-style Alerts and Escalations panels until parsing is enabled
+
+The Xymon dashboard provides:
+
+- Red / Yellow / Purple / Green status counts
+- Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr
+- Mailbox sync status and scan coverage tracking
+- Blank ESET-style Alerts and Escalations panels until parsing is enabled
 
 Switch between dashboards using the dropdown in the top-left nav.
 
@@ -495,6 +526,10 @@ python -m app.scanner --sample
 ```
 
 The scanner processes each unique Graph `message_id` only once.
+
+Acronis and Xymon run their own background scanners while the web app is running. They currently validate mailbox access and update scan state, but parsing/storage is disabled until sample notification emails are available.
+
+All three monitors poll every `APP_POLL_INTERVAL_SECONDS` seconds while the FastAPI app is running. The default is 60 seconds.
 
 ---
 
