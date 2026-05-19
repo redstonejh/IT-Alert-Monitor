@@ -825,6 +825,7 @@ pre {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  align-items: end;
 }
 
 .form-grid label {
@@ -885,7 +886,7 @@ pre {
 .fl-lbl {
   position: absolute;
   left: 14px;
-  top: 50%;
+  top: 27px;
   transform: translateY(-50%);
   color: var(--muted);
   font-size: 13px;
@@ -2699,6 +2700,7 @@ pre {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
+  outline: 0;
   transition: background .14s ease, border-color .14s ease, color .14s ease, box-shadow .14s ease;
 }
 
