@@ -269,7 +269,7 @@ A threat `Win32/Backdoor.Agent` arrives on `HOST-01`.
 8. **Override fires:** final score = **100** → **Critical**
 
 Same scenario without the failed remediation (action_taken = "Quarantined"):
-- Score = 90 + 20 − 20 = **90** → **Critical** (still above 95 threshold)
+- Score = 90 + 20 − 20 = **90** → **High** (below the Critical threshold of 95)
 
 ---
 
