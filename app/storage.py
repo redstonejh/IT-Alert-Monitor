@@ -129,21 +129,37 @@ def acronis_alert_exists(message_id: str) -> bool:
     return row is not None
 
 
+def get_acronis_alert(alert_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM acronis_alerts WHERE id = ?", (alert_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def save_acronis_alert(alert: ParsedAcronisAlert) -> None:
     data = alert.as_dict()
     columns = ", ".join(data.keys())
     placeholders = ", ".join(["?"] * len(data))
+    updates = ", ".join(
+        f"{column} = excluded.{column}"
+        for column in data.keys()
+        if column != "message_id"
+    )
     with get_connection() as conn:
-        try:
-            conn.execute(
-                f"INSERT INTO acronis_alerts({columns}) VALUES ({placeholders})",
-                tuple(data.values()),
-            )
-        except Exception:
-            pass
+        conn.execute(
+            f"""
+            INSERT INTO acronis_alerts({columns}) VALUES ({placeholders})
+            ON CONFLICT(message_id) DO UPDATE SET {updates}
+            """,
+            tuple(data.values()),
+        )
 
 
-def list_acronis_alerts(limit: int = 200, start: str = "", end: str = "") -> list[dict[str, Any]]:
+def list_acronis_alerts(
+    limit: int = 200,
+    start: str = "",
+    end: str = "",
+    severity: str = "",
+) -> list[dict[str, Any]]:
     conds: list[str] = []
     params: list[Any] = []
     if start:
@@ -152,6 +168,9 @@ def list_acronis_alerts(limit: int = 200, start: str = "", end: str = "") -> lis
     if end:
         conds.append("received_time <= ?")
         params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    if severity:
+        conds.append("LOWER(severity) = ?")
+        params.append(severity.lower())
     where = ("WHERE " + " AND ".join(conds)) if conds else ""
     params.append(limit)
     with get_connection() as conn:
@@ -224,6 +243,12 @@ def xymon_alert_exists(message_id: str) -> bool:
     return row is not None
 
 
+def get_xymon_alert(alert_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM xymon_alerts WHERE id = ?", (alert_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def save_xymon_alert(alert: ParsedXymonAlert) -> None:
     data = alert.as_dict()
     columns = ", ".join(data.keys())
@@ -238,7 +263,12 @@ def save_xymon_alert(alert: ParsedXymonAlert) -> None:
             pass
 
 
-def list_xymon_alerts(limit: int = 200, start: str = "", end: str = "") -> list[dict[str, Any]]:
+def list_xymon_alerts(
+    limit: int = 200,
+    start: str = "",
+    end: str = "",
+    status: str = "",
+) -> list[dict[str, Any]]:
     conds: list[str] = []
     params: list[Any] = []
     if start:
@@ -247,6 +277,9 @@ def list_xymon_alerts(limit: int = 200, start: str = "", end: str = "") -> list[
     if end:
         conds.append("received_time <= ?")
         params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    if status:
+        conds.append("LOWER(status) = ?")
+        params.append(status.lower())
     where = ("WHERE " + " AND ".join(conds)) if conds else ""
     params.append(limit)
     with get_connection() as conn:

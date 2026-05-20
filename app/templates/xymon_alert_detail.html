@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+{% set status = alert.status_display or "Unknown" %}
+{% set host = alert.host or "Unknown host" %}
+{% set title = alert.test_name or alert.message or alert.subject or "Xymon alert detail" %}
+
+<section class="alert-hero">
+  <div class="alert-hero-copy">
+    <span class="db-brand-label">Xymon alert detail</span>
+    <h1>{{ title }}</h1>
+    <p>{{ host }} · {{ alert.received_display or alert.received_time }}</p>
+  </div>
+  <a class="cmd-btn cmd-btn-ghost" href="/xymon">Back to Xymon</a>
+</section>
+
+<section class="alert-summary-band">
+  <article>
+    <span>Status</span>
+    <strong><span class="sev-tag {{ alert.status_class }}">{{ status }}</span></strong>
+  </article>
+  <article>
+    <span>Host</span>
+    <strong>{{ host }}</strong>
+  </article>
+  <article>
+    <span>Test</span>
+    <strong>{{ alert.test_name or "Not found" }}</strong>
+  </article>
+  <article>
+    <span>Group/Page</span>
+    <strong>{{ alert.group_display or alert.group_name or "Not found" }}</strong>
+  </article>
+</section>
+
+<section class="alert-detail-layout">
+  <article class="alert-panel alert-panel-main">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Status</span>
+        <h2>Alert Summary</h2>
+      </div>
+    </div>
+    <dl class="detail-list detail-list-featured">
+      <dt>Message</dt><dd>{{ alert.message or "Not found" }}</dd>
+      <dt>Age/Duration</dt><dd>{{ alert.age or "Not found" }}</dd>
+      <dt>Subject</dt><dd>{{ alert.subject or "Not found" }}</dd>
+      <dt>Sender</dt><dd>{{ alert.sender or "Not found" }}</dd>
+      <dt>Received</dt><dd>{{ alert.received_display or alert.received_time or "Not found" }}</dd>
+    </dl>
+  </article>
+
+  <article class="alert-panel escalation-panel">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Escalation</span>
+        <h2>Not escalated</h2>
+      </div>
+    </div>
+    <dl class="detail-list">
+      <dt>Status</dt><dd>Xymon escalation handling is not enabled yet.</dd>
+      <dt>Host</dt><dd>{{ host }}</dd>
+      <dt>Test</dt><dd>{{ alert.test_name or "Not found" }}</dd>
+    </dl>
+  </article>
+</section>
+
+<section class="alert-panel raw-panel">
+  <div class="alert-panel-head">
+    <div>
+      <span class="section-kicker">Evidence</span>
+      <h2>Raw Payload</h2>
+    </div>
+  </div>
+  <pre>{{ alert.raw_payload or "Not found" }}</pre>
+</section>
+
+<section class="alert-panel metadata-panel">
+  <div class="alert-panel-head">
+    <div>
+      <span class="section-kicker">Message metadata</span>
+      <h2>Parser Fields</h2>
+    </div>
+  </div>
+  <dl class="detail-list metadata-list">
+    <dt>Alert ID</dt><dd>{{ alert.id }}</dd>
+    <dt>Message ID</dt><dd>{{ alert.message_id or "Not found" }}</dd>
+    <dt>Internet message ID</dt><dd>{{ alert.internet_message_id or "Not found" }}</dd>
+    <dt>Created</dt><dd>{{ alert.created_at or "Not found" }}</dd>
+  </dl>
+</section>
+{% endblock %}

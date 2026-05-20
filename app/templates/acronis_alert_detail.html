@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+{% set severity = alert.severity_display or "Unknown" %}
+{% set machine = alert.device or "Unknown machine" %}
+{% set title = alert.reason or alert.alert_type or "Acronis alert detail" %}
+
+<section class="alert-hero">
+  <div class="alert-hero-copy">
+    <span class="db-brand-label">Acronis alert detail</span>
+    <h1>{{ title }}</h1>
+    <p>{{ machine }} · {{ alert.date_display or alert.received_display or alert.received_time }}</p>
+  </div>
+  <a class="cmd-btn cmd-btn-ghost" href="/acronis">Back to Acronis</a>
+</section>
+
+<section class="alert-summary-band">
+  <article>
+    <span>Severity</span>
+    <strong><span class="sev-tag sev-{{ alert.severity_class }}">{{ severity }}</span></strong>
+  </article>
+  <article>
+    <span>Company</span>
+    <strong>{{ alert.company_display or "Not found" }}</strong>
+  </article>
+  <article>
+    <span>Machine</span>
+    <strong>{{ machine }}</strong>
+  </article>
+  <article>
+    <span>Backup</span>
+    <strong>{{ alert.backup_failed_display }}</strong>
+  </article>
+</section>
+
+<section class="alert-detail-layout">
+  <article class="alert-panel alert-panel-main">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Backup</span>
+        <h2>Alert Summary</h2>
+      </div>
+    </div>
+    <dl class="detail-list detail-list-featured">
+      <dt>Date</dt><dd>{{ alert.date_display or "Not found" }}</dd>
+      <dt>Company</dt><dd>{{ alert.company_display or "Not found" }}</dd>
+      <dt>Machine</dt><dd>{{ alert.device or "Not found" }}</dd>
+      <dt>Backup</dt><dd>{{ alert.backup_failed_display }}</dd>
+      <dt>Reason</dt><dd>{{ alert.reason or "Not found" }}</dd>
+      <dt>Status</dt><dd>{{ severity }}</dd>
+      <dt>Subject</dt><dd>{{ alert.subject or "Not found" }}</dd>
+    </dl>
+  </article>
+
+  <article class="alert-panel escalation-panel">
+    <div class="alert-panel-head">
+      <div>
+        <span class="section-kicker">Escalation</span>
+        <h2>Not escalated</h2>
+      </div>
+    </div>
+    <dl class="detail-list">
+      <dt>Status</dt><dd>Acronis escalation handling is not enabled yet.</dd>
+      <dt>Received</dt><dd>{{ alert.received_display or alert.received_time }}</dd>
+      <dt>Sender</dt><dd>{{ alert.sender or "Not found" }}</dd>
+    </dl>
+  </article>
+</section>
+
+<section class="alert-panel raw-panel">
+  <div class="alert-panel-head">
+    <div>
+      <span class="section-kicker">Evidence</span>
+      <h2>Raw Email Body</h2>
+    </div>
+  </div>
+  <pre>{{ alert.raw_email_body }}</pre>
+</section>
+
+<section class="alert-panel metadata-panel">
+  <div class="alert-panel-head">
+    <div>
+      <span class="section-kicker">Message metadata</span>
+      <h2>Parser Fields</h2>
+    </div>
+  </div>
+  <dl class="detail-list metadata-list">
+    <dt>Alert ID</dt><dd>{{ alert.id }}</dd>
+    <dt>Message ID</dt><dd>{{ alert.message_id or "Not found" }}</dd>
+    <dt>Internet message ID</dt><dd>{{ alert.internet_message_id or "Not found" }}</dd>
+    <dt>Created</dt><dd>{{ alert.created_at or "Not found" }}</dd>
+  </dl>
+</section>
+{% endblock %}

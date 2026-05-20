@@ -1,11 +1,13 @@
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 import json
+import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
+from app.company_abbreviations import abbreviate_company
 from app.oauth import local_redirect_uri
 from app.scanner import DEFAULT_LOOKBACK_DAYS, run_scan, run_scan_range
 from app.storage import (
@@ -66,6 +68,14 @@ def _decode_reasons(value: object) -> list[str]:
     return [str(loaded)]
 
 
+def _search_matches(query: str, values: list[object]) -> bool:
+    terms = [term for term in re.split(r"\s+", query.strip().lower()) if term]
+    if not terms:
+        return True
+    haystack = " ".join(str(value or "") for value in values).lower()
+    return all(term in haystack for term in terms)
+
+
 def _split_domain_user(value: object) -> tuple[str, str]:
     text = str(value or "").strip()
     if "\\" in text:
@@ -77,9 +87,72 @@ def _split_domain_user(value: object) -> tuple[str, str]:
     return "", text
 
 
+def _company_hint(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"[^A-Za-z0-9]+", " ", text).strip()
+    text = re.sub(r"\b(domain|local|corp|lan)\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+    candidates = [text, text.split()[0]]
+    candidates.append(re.sub(r"\d+$", "", candidates[-1]))
+    for candidate in candidates:
+        if not candidate:
+            continue
+        abbreviated = abbreviate_company(candidate)
+        if abbreviated != candidate:
+            return abbreviated
+    compact = re.sub(r"[^A-Za-z0-9]", "", text).upper()
+    return compact[:3] if len(compact) >= 3 else compact
+
+
+def _alert_company_display(row: dict) -> str:
+    client = abbreviate_company(row.get("client_name", ""))
+    if client:
+        return client
+    domain, _user = _split_domain_user(row.get("username"))
+    return _company_hint(domain) or _company_hint(row.get("hostname")) or _company_hint(row.get("computer_name")) or ""
+
+
+def _alert_user_display(row: dict) -> str:
+    _domain, user = _split_domain_user(row.get("username"))
+    return user or str(row.get("hostname") or row.get("computer_name") or "").strip()
+
+
+def _alert_machine_display(row: dict) -> str:
+    return str(row.get("hostname") or row.get("computer_name") or "").strip()
+
+
+def _threat_method_display(row: dict) -> str:
+    threat = str(row.get("threat_name") or row.get("detection_name") or "").strip()
+    lower = threat.lower()
+    method_map = (
+        ("phishing", "Phishing"),
+        ("redirector", "Redirect"),
+        ("packed", "Packed"),
+        ("downloader", "Downloader"),
+        ("adware", "Adware"),
+        ("fakealert", "FakeAlert"),
+        ("exploit", "Exploit"),
+        ("riskware", "Riskware"),
+        ("trojan", "Trojan"),
+        ("kryptik", "Kryptik"),
+        ("script", "Script"),
+    )
+    for token, label in method_map:
+        if token in lower:
+            return label
+    if "/" in threat:
+        threat = threat.split("/", 1)[1]
+    return re.split(r"[^A-Za-z0-9]+", threat, 1)[0].title() if threat else ""
+
+
 def _escalation_title(row: dict) -> str:
     severity = str(row.get("severity") or "Critical").strip().title()
     host = str(row.get("hostname") or row.get("computer_name") or "unknown host").strip()
+    client = abbreviate_company(str(row.get("client_name") or ""))
     domain, user = _split_domain_user(row.get("username"))
     if user and domain:
         return f"{severity} Alert: {user} @ {domain}"
@@ -87,6 +160,8 @@ def _escalation_title(row: dict) -> str:
         return f"{severity} Alert: {user}"
     if domain:
         return f"{severity} Alert: {host} @ {domain}"
+    if client:
+        return f"{severity} Alert: {client} - {host}"
     return f"{severity} Alert: {host}"
 
 
@@ -126,6 +201,17 @@ def _format_date_short(d: str) -> str:
         return f"{dt:%b} {dt.day}, {dt.year}"
     except (ValueError, TypeError):
         return d or ""
+
+
+def _format_date_compact(value: str) -> str:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%m/%d/%y")
+    except (ValueError, TypeError):
+        return value or ""
+
+
+def _range_display(start: str, end: str) -> str:
+    return f"{_format_date_compact(start)} - {_format_date_compact(end)}"
 
 
 def _pacific_fallback(utc: datetime) -> datetime:
@@ -178,6 +264,19 @@ def _safe_range_days(value: str) -> int:
     return days if days in allowed else DEFAULT_LOOKBACK_DAYS
 
 
+def _custom_range(start_value: str, end_value: str) -> tuple[str, str] | None:
+    if not start_value or not end_value:
+        return None
+    try:
+        start = datetime.strptime(start_value, "%Y-%m-%d").date()
+        end = datetime.strptime(end_value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    if start > end:
+        start, end = end, start
+    return start.isoformat(), end.isoformat()
+
+
 def _safe_metric(value: str) -> str:
     return value if value in METRIC_LABELS else ""
 
@@ -216,18 +315,28 @@ def dashboard(request: Request):
     config = asdict(get_config(include_secrets=False))
     active_days = _safe_range_days(request.query_params.get("range", str(DEFAULT_LOOKBACK_DAYS)))
     active_metric = _safe_metric(request.query_params.get("metric", ""))
-    view_start = _range_start(active_days)
-    view_end = _today_utc().date().isoformat()
-    active_label = next(
-        preset["label"] for preset in RANGE_PRESETS if preset["days"] == active_days
-    )
+    search_query = request.query_params.get("q", "").strip()
+    custom_range = _custom_range(request.query_params.get("start", ""), request.query_params.get("end", ""))
+    if custom_range:
+        view_start, view_end = custom_range
+        active_label = f"{view_start} to {view_end}"
+        range_query = f"start={view_start}&end={view_end}"
+        coverage_days = max(1, (_today_utc().date() - datetime.strptime(view_start, "%Y-%m-%d").date()).days + 1)
+    else:
+        view_start = _range_start(active_days)
+        view_end = _today_utc().date().isoformat()
+        active_label = next(
+            preset["label"] for preset in RANGE_PRESETS if preset["days"] == active_days
+        )
+        range_query = f"range={active_days}"
+        coverage_days = active_days
 
     auto_scanned = False
     auto_processed = 0
     auto_scan_failed = False
     if config.get("oauth_account"):
         try:
-            auto_scanned, auto_processed = _ensure_scan_coverage(active_days)
+            auto_scanned, auto_processed = _ensure_scan_coverage(coverage_days)
         except Exception:
             auto_scan_failed = True
 
@@ -242,13 +351,43 @@ def dashboard(request: Request):
         recent_alerts = list_current_escalation_cases(500, start=view_start, end=view_end)
     else:
         recent_alerts = list_alerts(500, start=view_start, end=view_end, metric=active_metric)
+    filtered_alerts = []
     for alert in recent_alerts:
         alert["received_display"] = _format_datetime(alert.get("received_time"))
+        alert["client_display"] = _alert_company_display(alert)
+        alert["user_display"] = _alert_user_display(alert)
+        alert["machine_display"] = _alert_machine_display(alert)
+        alert["method_display"] = _threat_method_display(alert)
         alert["score_reasons_list"] = _decode_reasons(alert.get("score_reasons"))
         alert["status_display"] = _status_keyword(alert)
+        if search_query and not _search_matches(
+            search_query,
+            [
+                alert.get("received_display"),
+                alert.get("client_display"),
+                alert.get("user_display"),
+                alert.get("machine_display"),
+                alert.get("method_display"),
+                alert.get("status_display"),
+                alert.get("severity"),
+                alert.get("threat_name"),
+                alert.get("detection_name"),
+                alert.get("hostname"),
+                alert.get("computer_name"),
+                alert.get("username"),
+                alert.get("client_name"),
+                alert.get("subject"),
+                alert.get("sender"),
+                alert.get("raw_email_body"),
+            ],
+        ):
+            continue
+        filtered_alerts.append(alert)
+    recent_alerts = filtered_alerts
     teams_messages = list_current_escalation_cases(50, start=view_start, end=view_end)
     for message in teams_messages:
         message["created_display"] = _format_datetime(message.get("created_at"))
+        message["client_display"] = abbreviate_company(message.get("client_name", ""))
         message["reason_label"] = _escalation_title(message)
         message["domain"], message["user_display"] = _split_domain_user(message.get("username"))
         message["parsed"] = _parse_payload(message.get("payload", ""))
@@ -268,6 +407,10 @@ def dashboard(request: Request):
             "view_end": view_end,
             "active_days": active_days,
             "active_metric": active_metric,
+            "search_query": search_query,
+            "custom_range": bool(custom_range),
+            "range_query": range_query,
+            "range_display": _range_display(view_start, view_end),
             "metric_label": METRIC_LABELS[active_metric],
             "range_presets": RANGE_PRESETS,
             "auto_scanned": auto_scanned,

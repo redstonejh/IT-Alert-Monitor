@@ -33,12 +33,79 @@ async function postAction(url, button) {
   }
 }
 
-document.querySelectorAll("[data-action]").forEach((button) => {
-  button.addEventListener("click", () => postAction(button.dataset.action, button));
+  document.querySelectorAll("[data-action]").forEach((button) => {
+    button.addEventListener("click", () => postAction(button.dataset.action, button));
+  });
+
+document.querySelectorAll(".range-custom").forEach((form) => {
+  const startInput = form.querySelector('input[name="start"]');
+  const endInput = form.querySelector('input[name="end"]');
+  const trigger = form.querySelector(".range-custom-trigger");
+  const openPicker = (input) => {
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    } else {
+      input.focus();
+      input.click();
+    }
+  };
+  trigger?.addEventListener("click", () => {
+    form.dataset.pickingRange = "start";
+    openPicker(startInput);
+  });
+  startInput?.addEventListener("change", () => {
+    form.dataset.pickingRange = "end";
+    window.setTimeout(() => openPicker(endInput), 120);
+  });
+  endInput?.addEventListener("change", () => {
+    const start = startInput?.value;
+    const end = endInput?.value;
+    if (start && end) {
+      form.classList.add("range-complete");
+      form.requestSubmit();
+    }
+  });
 });
 
 document.addEventListener("DOMContentLoaded", () => {
   const showToast = showGlobalToast;
+
+  const refreshOverflowTitles = () => {
+    const skipTags = new Set(["SCRIPT", "STYLE", "SVG", "PATH", "INPUT", "TEXTAREA", "SELECT", "OPTION"]);
+    document.querySelectorAll("body *").forEach((element) => {
+      if (skipTags.has(element.tagName)) return;
+      const text = (element.textContent || "").replace(/\s+/g, " ").trim();
+      if (!text || text.length < 2) return;
+      const style = window.getComputedStyle(element);
+      const canClip = style.textOverflow === "ellipsis" || style.overflow === "hidden" || style.whiteSpace === "nowrap";
+      if (!canClip || !element.clientWidth) return;
+      const clipped = element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1;
+      if (clipped) {
+        if (!element.getAttribute("title") || element.dataset.autoTitle === "true") {
+          element.setAttribute("title", text);
+          element.dataset.autoTitle = "true";
+        }
+      } else if (element.dataset.autoTitle === "true") {
+        element.removeAttribute("title");
+        delete element.dataset.autoTitle;
+      }
+    });
+  };
+
+  let overflowTitleTimer;
+  const scheduleOverflowTitles = () => {
+    window.clearTimeout(overflowTitleTimer);
+    overflowTitleTimer = window.setTimeout(refreshOverflowTitles, 80);
+  };
+  refreshOverflowTitles();
+  window.addEventListener("load", scheduleOverflowTitles);
+  window.addEventListener("resize", scheduleOverflowTitles);
+  new MutationObserver(scheduleOverflowTitles).observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
 
   // Dashboard switcher dropdown
   const switcherToggle = document.getElementById("dash-switcher-toggle");
@@ -61,7 +128,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (new URLSearchParams(window.location.search).has("saved")) {
-    showToast("Configuration saved and historical alerts rescored.");
+    const path = window.location.pathname;
+    if (path.startsWith("/xymon")) {
+      showToast("Xymon configuration saved.");
+    } else if (path.startsWith("/acronis")) {
+      showToast("Acronis configuration saved.");
+    } else {
+      showToast("Configuration saved and historical alerts rescored.");
+    }
   }
 
   const scoreDialog = document.getElementById("score-dialog");

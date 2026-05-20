@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import requests
 
+from app.company_abbreviations import abbreviate_company
 from app.models import ParsedAlert
 from app.rules import reason_label
 
@@ -25,6 +26,7 @@ class TeamsNotifier:
         lines = [
             f"**{title}**",
             f"Reason: {reason_label(reason)}",
+            f"Client: {abbreviate_company(alert.client_name) or 'Unknown'}",
             f"Hostname: {alert.hostname or 'Unknown'}",
             f"User: {alert.username or 'Unknown'}",
             f"Action: {alert.action_taken or 'Unknown'}",

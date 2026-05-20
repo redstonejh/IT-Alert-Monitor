@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
+import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
-from app.storage import get_state, get_xymon_config, list_xymon_alerts, xymon_dashboard_stats
+from app.company_abbreviations import abbreviate_company
+from app.storage import get_state, get_xymon_alert, get_xymon_config, list_xymon_alerts, xymon_dashboard_stats
 from app.xymon_scanner import DEFAULT_LOOKBACK_DAYS, run_xymon_scan, run_xymon_scan_range
 
 router = APIRouter()
@@ -18,6 +20,13 @@ RANGE_PRESETS = [
     {"days": 180, "label": "Last 6 months", "short": "6mo"},
     {"days": 365, "label": "Last year", "short": "1yr"},
 ]
+METRIC_LABELS = {
+    "": "Alerts",
+    "red": "Red alerts",
+    "yellow": "Yellow alerts",
+    "purple": "Purple alerts",
+    "green": "Green alerts",
+}
 
 
 def _pacific_fallback(utc: datetime) -> datetime:
@@ -50,6 +59,17 @@ def _format_datetime(value: object) -> str:
     return f"{local:%m/%d/%y} {hour}:{local:%M %p}"
 
 
+def _format_date_compact(value: str) -> str:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%m/%d/%y")
+    except (ValueError, TypeError):
+        return value or ""
+
+
+def _range_display(start: str, end: str) -> str:
+    return f"{_format_date_compact(start)} - {_format_date_compact(end)}"
+
+
 def _today_utc() -> datetime:
     return datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -68,6 +88,42 @@ def _safe_range_days(value: str) -> int:
         return DEFAULT_LOOKBACK_DAYS
     allowed = {preset["days"] for preset in RANGE_PRESETS}
     return days if days in allowed else DEFAULT_LOOKBACK_DAYS
+
+
+def _custom_range(start_value: str, end_value: str) -> tuple[str, str] | None:
+    if not start_value or not end_value:
+        return None
+    try:
+        start = datetime.strptime(start_value, "%Y-%m-%d").date()
+        end = datetime.strptime(end_value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    if start > end:
+        start, end = end, start
+    return start.isoformat(), end.isoformat()
+
+
+def _safe_metric(value: str) -> str:
+    return value if value in METRIC_LABELS else ""
+
+
+def _search_matches(query: str, values: list[object]) -> bool:
+    terms = [term for term in re.split(r"\s+", query.strip().lower()) if term]
+    if not terms:
+        return True
+    haystack = " ".join(str(value or "") for value in values).lower()
+    return all(term in haystack for term in terms)
+
+
+def _status_class(status: object) -> str:
+    normalized = str(status or "").strip().lower()
+    if normalized in {"red", "yellow", "purple", "green"}:
+        return f"sev-xymon-{normalized}"
+    return "sev-unknown"
+
+
+def _status_display(status: object) -> str:
+    return str(status or "").strip().title() or "Unknown"
 
 
 def _ensure_xymon_scan_coverage(days: int) -> tuple[bool, int]:
@@ -103,23 +159,51 @@ def _ensure_xymon_scan_coverage(days: int) -> tuple[bool, int]:
 def xymon_dashboard(request: Request):
     xymon_config = get_xymon_config()
     active_days = _safe_range_days(request.query_params.get("range", str(DEFAULT_LOOKBACK_DAYS)))
-    view_start = _range_start(active_days)
-    view_end = _today_utc().date().isoformat()
+    active_metric = _safe_metric(request.query_params.get("metric", ""))
+    search_query = request.query_params.get("q", "").strip()
+    custom_range = _custom_range(request.query_params.get("start", ""), request.query_params.get("end", ""))
+    if custom_range:
+        view_start, view_end = custom_range
+        range_query = f"start={view_start}&end={view_end}"
+        coverage_days = max(1, (_today_utc().date() - datetime.strptime(view_start, "%Y-%m-%d").date()).days + 1)
+    else:
+        view_start = _range_start(active_days)
+        view_end = _today_utc().date().isoformat()
+        range_query = f"range={active_days}"
+        coverage_days = active_days
     auto_scanned = False
     auto_processed = 0
     auto_scan_failed = False
     if xymon_config.mailbox_address:
         try:
-            auto_scanned, auto_processed = _ensure_xymon_scan_coverage(active_days)
+            auto_scanned, auto_processed = _ensure_xymon_scan_coverage(coverage_days)
         except Exception:
             auto_scan_failed = True
     last_scan_display = _format_datetime(get_state("xymon_last_scan_time"))
     last_scan_error = get_state("xymon_last_scan_error")
     stats = xymon_dashboard_stats(start=view_start, end=view_end)
-    raw_alerts = list_xymon_alerts(limit=200, start=view_start, end=view_end)
+    raw_alerts = list_xymon_alerts(limit=200, start=view_start, end=view_end, status=active_metric)
     alerts = []
     for row in raw_alerts:
         row["received_display"] = _format_datetime(row.get("received_time"))
+        row["status_display"] = _status_display(row.get("status"))
+        row["status_class"] = _status_class(row.get("status"))
+        if search_query and not _search_matches(
+            search_query,
+            [
+                row.get("received_display"),
+                row.get("host"),
+                row.get("test_name"),
+                row.get("status_display"),
+                row.get("message"),
+                row.get("age"),
+                row.get("group_name"),
+                row.get("subject"),
+                row.get("sender"),
+                row.get("raw_payload"),
+            ],
+        ):
+            continue
         alerts.append(row)
     return templates.TemplateResponse(
         "xymon_dashboard.html",
@@ -131,11 +215,35 @@ def xymon_dashboard(request: Request):
             "xymon_stats": stats,
             "xymon_alerts": alerts,
             "active_days": active_days,
+            "active_metric": active_metric,
+            "search_query": search_query,
+            "custom_range": bool(custom_range),
+            "range_query": range_query,
+            "range_display": _range_display(view_start, view_end),
+            "metric_label": METRIC_LABELS[active_metric],
             "range_presets": RANGE_PRESETS,
             "view_start": view_start,
             "view_end": view_end,
             "auto_scanned": auto_scanned,
             "auto_processed": auto_processed,
             "auto_scan_failed": auto_scan_failed,
+        },
+    )
+
+
+@router.get("/xymon/alerts/{alert_id}")
+def xymon_alert_detail(request: Request, alert_id: int):
+    alert = get_xymon_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Xymon alert not found")
+    alert["received_display"] = _format_datetime(alert.get("received_time"))
+    alert["status_display"] = _status_display(alert.get("status"))
+    alert["status_class"] = _status_class(alert.get("status"))
+    alert["group_display"] = abbreviate_company(alert.get("group_name", ""))
+    return templates.TemplateResponse(
+        "xymon_alert_detail.html",
+        {
+            "request": request,
+            "alert": alert,
         },
     )

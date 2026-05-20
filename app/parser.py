@@ -70,6 +70,20 @@ def parse_graph_message(message: dict) -> ParsedAlert:
         alert.threat_name = alert.detection_name
     if not alert.hostname:
         alert.hostname = alert.computer_name
+    subject_match = re.search(
+        r"^(?:malicious file|suspicious application|potentially unwanted application)\s+(.+?)\s+was detected on computer\s+(.+?)(?:[.!]|$)",
+        alert.subject,
+        flags=re.IGNORECASE,
+    )
+    if subject_match:
+        if not alert.threat_name:
+            alert.threat_name = subject_match.group(1).strip()
+        if not alert.detection_name:
+            alert.detection_name = alert.threat_name
+        if not alert.hostname:
+            alert.hostname = subject_match.group(2).strip()
+        if not alert.computer_name:
+            alert.computer_name = alert.hostname
     # Infer action_taken from subject when email body has no action field
     if not alert.action_taken:
         subject_lower = alert.subject.lower()

@@ -2,7 +2,7 @@ import logging
 from copy import copy
 from datetime import datetime, timedelta, timezone
 
-from app.acronis_parser import parse_acronis_message
+from app.acronis_parser import is_acronis_message, parse_acronis_messages
 from app.database import init_db
 from app.graph_client import GraphClient
 from app.storage import acronis_alert_exists, get_acronis_config, save_acronis_alert, update_state
@@ -48,17 +48,25 @@ def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
         }
     for message in messages:
         message_id = message.get("id", "")
-        if not message_id or acronis_alert_exists(message_id):
+        if not message_id:
+            skipped += 1
+            continue
+        if not is_acronis_message(message):
             skipped += 1
             continue
         try:
-            alert = parse_acronis_message(message)
+            alerts = parse_acronis_messages(message)
         except Exception:
             parse_failed += 1
             logger.exception("Acronis parser failed for message id=%s", message_id)
             continue
-        save_acronis_alert(alert)
-        processed += 1
+        for alert in alerts:
+            was_new = not acronis_alert_exists(alert.message_id)
+            save_acronis_alert(alert)
+            if was_new:
+                processed += 1
+            else:
+                skipped += 1
 
     update_state("acronis_last_scan_time", datetime.now(timezone.utc).isoformat())
     logger.info(

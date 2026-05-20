@@ -71,7 +71,7 @@
       </div>
     </div>
     <dl class="detail-list">
-      <dt>Client</dt><dd>{{ alert.client_name or "Not found" }}</dd>
+      <dt>Client</dt><dd>{{ alert.client_display or alert.client_name or "Not found" }}</dd>
       <dt>Hostname</dt><dd>{{ alert.hostname or "Not found" }}</dd>
       <dt>Computer</dt><dd>{{ alert.computer_name or "Not found" }}</dd>
       <dt>User</dt><dd>{{ alert.username or "Not found" }}</dd>

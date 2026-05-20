@@ -188,6 +188,14 @@ class GraphClient:
         subject_filter = (getattr(self.config, "subject_filter", None) or
                           getattr(self.config, "eset_subject_filter", "")).lower().strip()
         subject_pattern = re.compile(r'\b' + re.escape(subject_filter) + r'\b') if subject_filter else None
+
+        def is_eset_detection_subject(sender: str, subject: str) -> bool:
+            return (
+                "report@protect.eset.com" in sender
+                and " was detected on computer " in subject
+                and any(kind in subject for kind in ("malicious file", "suspicious application", "potentially unwanted"))
+            )
+
         matched: list[dict] = []
         for message in messages:
             sender = (
@@ -200,7 +208,7 @@ class GraphClient:
             if sender_filter and sender_filter not in sender:
                 logger.info("Local filter DROP sender_mismatch: sender=%s subject=%.60s", sender, subject)
                 continue
-            if subject_pattern and not subject_pattern.search(subject):
+            if subject_pattern and not subject_pattern.search(subject) and not is_eset_detection_subject(sender, subject):
                 logger.info("Local filter DROP subject_mismatch: sender=%s subject=%.60s", sender, subject)
                 continue
             matched.append(message)

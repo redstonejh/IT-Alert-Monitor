@@ -16,3 +16,9 @@ server_dashboard.html
 server_settings.html
 style_check.css
 tests/__pycache__/
+
+# Agent and local workflow artifacts
+.agent_pipeline/
+AGENTS.md
+*.code-workspace
+server.log

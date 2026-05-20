@@ -1,35 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
+{% if xymon_config.mailbox_address %}
+<script>setTimeout(() => location.reload(), 60000);</script>
+{% endif %}
 
 <header class="app-nav">
   <div class="app-nav-brand-group">
-    <a class="app-nav-brand" href="/xymon" aria-label="Xymon Monitor dashboard">
-      <span class="app-logo app-logo-xymon" aria-hidden="true">X</span>
-      <span>
-        <strong>Xymon Monitor</strong>
-        <small>Infrastructure status dashboard</small>
-      </span>
-    </a>
     <div class="dash-switcher">
       <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
         Xymon <span class="dash-switch-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dash-switch-menu" id="dash-switch-menu">
         <a class="dash-switch-opt" href="/dashboard">
-          <span class="dsw-icon dsw-icon-eset" aria-hidden="true">E</span>
           <span><strong>ESET Alerts</strong><small>Endpoint security</small></span>
         </a>
         <a class="dash-switch-opt" href="/acronis">
-          <span class="dsw-icon dsw-icon-acronis" aria-hidden="true">A</span>
           <span><strong>Acronis Backups</strong><small>Backup monitoring</small></span>
         </a>
         <a class="dash-switch-opt dash-switch-opt-active" href="/xymon" aria-current="page">
-          <span class="dsw-icon dsw-icon-xymon" aria-hidden="true">X</span>
           <span><strong>Xymon Status</strong><small>Infrastructure monitoring</small></span>
-          <span class="dsw-active-check" aria-hidden="true">✓</span>
         </a>
       </div>
     </div>
+    <a class="app-nav-brand" href="/xymon" aria-label="Xymon Monitor dashboard">
+      <span>
+        <strong>Xymon Monitor</strong>
+        <small>Infrastructure status dashboard</small>
+      </span>
+    </a>
   </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
     <div class="nav-status-item">
@@ -48,8 +46,12 @@
     </div>
   </div>
   <div class="app-nav-actions">
-    {% if auto_scan_failed %}
+    {% if auto_scanned and auto_processed > 0 %}
+      <span class="cmd-badge">{{ auto_processed }} added</span>
+    {% elif auto_scan_failed or request.query_params.get("scan_failed") or last_scan_error %}
       <span class="cmd-badge cmd-badge-warn">Backfill failed</span>
+    {% elif request.query_params.get("scanned") and request.query_params.get("scanned") != "0" %}
+      <span class="cmd-badge">{{ request.query_params.get("scanned") }} new</span>
     {% endif %}
     <a class="cmd-btn" href="/xymon/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if xymon_config.mailbox_address %}
@@ -60,7 +62,7 @@
   </div>
 </header>
 
-{% if auto_scan_failed %}
+{% if auto_scan_failed or request.query_params.get("scan_failed") or last_scan_error %}
 <section class="connection-empty empty-state">
   <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
   <strong>Xymon mailbox sync needs attention</strong>
@@ -70,37 +72,62 @@
 {% endif %}
 
 <nav class="range-bar" aria-label="Xymon view range">
-  <div class="range-presets">
-    {% for preset in range_presets %}
-      <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/xymon?range={{ preset.days }}">{{ preset.short }}</a>
-    {% endfor %}
+  <div class="range-controls">
+    <div class="range-presets">
+      {% for preset in range_presets %}
+        <a class="preset-btn {% if not custom_range and active_days == preset.days %}active{% endif %}" href="/xymon?range={{ preset.days }}{% if active_metric %}&metric={{ active_metric }}{% endif %}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">{{ preset.short }}</a>
+      {% endfor %}
+    </div>
+    <form class="range-custom" action="/xymon" method="get">
+      {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
+      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+      <button class="range-custom-trigger {% if custom_range %}active{% endif %}" type="button" aria-label="Choose custom date range">Custom range</button>
+      <input class="range-date-input range-date-start" type="date" name="start" value="{{ view_start }}" aria-label="Start date" tabindex="-1">
+      <input class="range-date-input range-date-end" type="date" name="end" value="{{ view_end }}" aria-label="End date" tabindex="-1">
+      <span class="range-path {% if custom_range %}active{% endif %}" aria-hidden="true"></span>
+      <span class="range-display">{{ range_display }}</span>
+    </form>
   </div>
+  <form class="range-search" action="/xymon" method="get" role="search">
+    {% if custom_range %}
+      <input type="hidden" name="start" value="{{ view_start }}">
+      <input type="hidden" name="end" value="{{ view_end }}">
+    {% else %}
+      <input type="hidden" name="range" value="{{ active_days }}">
+    {% endif %}
+    {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
+    <input class="range-search-input" type="search" name="q" value="{{ search_query }}" placeholder=" " aria-label="Search Xymon alerts">
+    <span class="range-search-label">Search alerts</span>
+    {% if search_query %}
+      <a class="range-search-clear" href="/xymon?{{ range_query }}{% if active_metric %}&metric={{ active_metric }}{% endif %}" aria-label="Clear search">Clear</a>
+    {% endif %}
+  </form>
 </nav>
 
 <div class="stat-band xym-stat-band">
-  <div class="stat-card xym-red {% if xymon_stats.red > 0 %}stat-danger{% endif %}">
+  <a class="stat-card xym-red {% if active_metric == 'red' %}active{% elif xymon_stats.red > 0 %}stat-danger{% endif %}" href="/xymon?{{ range_query }}&metric=red{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ xymon_stats.red }}</span>
     <span class="stat-lbl">Red</span>
-  </div>
-  <div class="stat-card xym-yellow {% if xymon_stats.yellow > 0 %}stat-warn{% endif %}">
+  </a>
+  <a class="stat-card xym-yellow {% if active_metric == 'yellow' %}active{% elif xymon_stats.yellow > 0 %}stat-warn{% endif %}" href="/xymon?{{ range_query }}&metric=yellow{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ xymon_stats.yellow }}</span>
     <span class="stat-lbl">Yellow</span>
-  </div>
-  <div class="stat-card xym-purple {% if xymon_stats.purple > 0 %}stat-purple{% endif %}">
+  </a>
+  <a class="stat-card xym-purple {% if active_metric == 'purple' %}active{% elif xymon_stats.purple > 0 %}stat-purple{% endif %}" href="/xymon?{{ range_query }}&metric=purple{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ xymon_stats.purple }}</span>
     <span class="stat-lbl">Purple</span>
-  </div>
-  <div class="stat-card xym-green">
+  </a>
+  <a class="stat-card xym-green {% if active_metric == 'green' %}active{% endif %}" href="/xymon?{{ range_query }}&metric=green{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ xymon_stats.green }}</span>
     <span class="stat-lbl">Green</span>
-  </div>
+  </a>
 </div>
 
 <div class="db-grid">
   <div class="db-panel">
     <div class="db-panel-hd db-panel-hd-alerts">
-      <span class="db-panel-title">Alerts</span>
-      <span class="db-panel-count">0</span>
+      <span class="db-panel-title">{{ metric_label }}</span>
+      <span class="db-panel-count">{{ xymon_alerts | length }}</span>
     </div>
     <div class="db-panel-body">
       <table class="al-table">
@@ -108,21 +135,33 @@
           <tr>
             <th>Received (PT)</th>
             <th>Host</th>
-            <th>Threat</th>
-            <th>Severity</th>
+            <th>Test</th>
             <th>Status</th>
+            <th>Message</th>
           </tr>
         </thead>
         <tbody>
+          {% for alert in xymon_alerts %}
+          <tr>
+            <td class="al-date" title="{{ alert.received_display or '' }}"><a href="/xymon/alerts/{{ alert.id }}">{{ alert.received_display or "—" }}</a></td>
+            <td class="al-host" title="{{ alert.host or '' }}">{{ alert.host or "Unknown host" }}</td>
+            <td class="al-threat" title="{{ alert.test_name or '' }}">{{ alert.test_name or "Unknown test" }}</td>
+            <td>
+              <span class="sev-tag {{ alert.status_class }}">{{ alert.status_display }}</span>
+            </td>
+            <td class="al-status" title="{{ alert.message or alert.age or '' }}">{{ alert.message or alert.age or "—" }}</td>
+          </tr>
+          {% else %}
           <tr>
             <td colspan="5" class="al-empty">
               <div class="empty-state empty-state-table">
                 <span class="empty-illustration" aria-hidden="true"></span>
                 <strong>No alerts in this view</strong>
-                <small>Xymon alert rows will appear here once parsing is enabled.</small>
+                <small>Xymon status rows will appear here once forwarded notification emails are scanned.</small>
               </div>
             </td>
           </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>

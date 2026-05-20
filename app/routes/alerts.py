@@ -3,6 +3,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
+from app.company_abbreviations import abbreviate_company
 from app.storage import (
     dashboard_stats,
     escalation_for_alert,
@@ -40,6 +41,7 @@ def alert_detail(request: Request, alert_id: int):
     alert = get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+    alert["client_display"] = abbreviate_company(alert.get("client_name", ""))
     return templates.TemplateResponse(
         "alert_detail.html",
         {

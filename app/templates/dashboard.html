@@ -10,33 +10,28 @@
 
 <header class="app-nav">
   <div class="app-nav-brand-group">
-    <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
-      <span class="app-logo" aria-hidden="true">E!</span>
-      <span>
-        <strong>ESET Alert Monitor</strong>
-        <small>Security operations dashboard</small>
-      </span>
-    </a>
     <div class="dash-switcher">
       <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
         ESET <span class="dash-switch-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dash-switch-menu" id="dash-switch-menu">
         <a class="dash-switch-opt dash-switch-opt-active" href="/dashboard" aria-current="page">
-          <span class="dsw-icon dsw-icon-eset" aria-hidden="true">E</span>
           <span><strong>ESET Alerts</strong><small>Endpoint security</small></span>
-          <span class="dsw-active-check" aria-hidden="true">✓</span>
         </a>
         <a class="dash-switch-opt" href="/acronis">
-          <span class="dsw-icon dsw-icon-acronis" aria-hidden="true">A</span>
           <span><strong>Acronis Backups</strong><small>Backup monitoring</small></span>
         </a>
         <a class="dash-switch-opt" href="/xymon">
-          <span class="dsw-icon dsw-icon-xymon" aria-hidden="true">X</span>
           <span><strong>Xymon Status</strong><small>Infrastructure monitoring</small></span>
         </a>
       </div>
     </div>
+    <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
+      <span>
+        <strong>ESET Alert Monitor</strong>
+        <small>Security operations dashboard</small>
+      </span>
+    </a>
   </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
     <div class="nav-status-item">
@@ -77,7 +72,6 @@
 
 {% if auto_scan_failed or request.query_params.get("scan_failed") %}
 <section class="connection-empty empty-state">
-  <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
   <strong>Mailbox sync needs attention</strong>
   <small>The last scan could not complete. Check Microsoft Graph settings, mailbox permissions, and folder filters.</small>
   <a class="empty-action" href="/settings">Open Configure</a>
@@ -105,33 +99,58 @@
 {% endif %}
 
 <nav class="range-bar" aria-label="Dashboard view range">
-  <div class="range-presets">
-    {% for preset in range_presets %}
-      {% if preset.days not in [730, 1825] %}
-      <a class="preset-btn {% if active_days == preset.days %}active{% endif %}" href="/dashboard?range={{ preset.days }}">{{ preset.short }}</a>
-      {% endif %}
-    {% endfor %}
+  <div class="range-controls">
+    <div class="range-presets">
+      {% for preset in range_presets %}
+        {% if preset.days not in [730, 1825] %}
+        <a class="preset-btn {% if not custom_range and active_days == preset.days %}active{% endif %}" href="/dashboard?range={{ preset.days }}{% if active_metric %}&metric={{ active_metric }}{% endif %}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">{{ preset.short }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <form class="range-custom" action="/dashboard" method="get">
+      {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
+      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+      <button class="range-custom-trigger {% if custom_range %}active{% endif %}" type="button" aria-label="Choose custom date range">Custom range</button>
+      <input class="range-date-input range-date-start" type="date" name="start" value="{{ view_start }}" aria-label="Start date" tabindex="-1">
+      <input class="range-date-input range-date-end" type="date" name="end" value="{{ view_end }}" aria-label="End date" tabindex="-1">
+      <span class="range-path {% if custom_range %}active{% endif %}" aria-hidden="true"></span>
+      <span class="range-display">{{ range_display }}</span>
+    </form>
   </div>
+  <form class="range-search" action="/dashboard" method="get" role="search">
+    {% if custom_range %}
+      <input type="hidden" name="start" value="{{ view_start }}">
+      <input type="hidden" name="end" value="{{ view_end }}">
+    {% else %}
+      <input type="hidden" name="range" value="{{ active_days }}">
+    {% endif %}
+    {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
+    <input class="range-search-input" type="search" name="q" value="{{ search_query }}" placeholder=" " aria-label="Search alerts">
+    <span class="range-search-label">Search alerts</span>
+    {% if search_query %}
+      <a class="range-search-clear" href="/dashboard?{{ range_query }}{% if active_metric %}&metric={{ active_metric }}{% endif %}" aria-label="Clear search">Clear</a>
+    {% endif %}
+  </form>
 </nav>
 
 <div class="stat-band">
-  <a class="stat-card {% if not active_metric or active_metric == 'total' %}active{% endif %}" href="/dashboard?range={{ active_days }}">
+  <a class="stat-card {% if not active_metric or active_metric == 'total' %}active{% endif %}" href="/dashboard?{{ range_query }}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.total }}</span>
     <span class="stat-lbl">Total alerts</span>
   </a>
-  <a class="stat-card {% if active_metric == 'critical' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=critical">
+  <a class="stat-card {% if active_metric == 'critical' %}active{% endif %}" href="/dashboard?{{ range_query }}&metric=critical{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.critical }}</span>
     <span class="stat-lbl">Critical clients</span>
   </a>
-  <a class="stat-card {% if active_metric == 'repeated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=repeated">
+  <a class="stat-card {% if active_metric == 'repeated' %}active{% endif %}" href="/dashboard?{{ range_query }}&metric=repeated{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.repeated }}</span>
     <span class="stat-lbl">Repeated threats</span>
   </a>
-  <a class="stat-card {% if active_metric == 'unresolved' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=unresolved">
+  <a class="stat-card {% if active_metric == 'unresolved' %}active{% endif %}" href="/dashboard?{{ range_query }}&metric=unresolved{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.failed }}</span>
     <span class="stat-lbl">Unresolved</span>
   </a>
-  <a class="stat-card {% if active_metric == 'escalated' %}active{% endif %}" href="/dashboard?range={{ active_days }}&metric=escalated">
+  <a class="stat-card {% if active_metric == 'escalated' %}active{% endif %}" href="/dashboard?{{ range_query }}&metric=escalated{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.teams_logged }}</span>
     <span class="stat-lbl">Escalated cases</span>
   </a>
@@ -149,23 +168,28 @@
         <thead>
           <tr>
             <th>Received (PT)</th>
-            <th>Host</th>
-            <th>Threat</th>
+            <th>Company</th>
+            <th>User</th>
+            <th>Machine</th>
+            <th>Method</th>
+            <th>Status</th>
             <th>
               <span class="severity-head">
                 Severity
                 <button class="severity-help-btn" type="button" popovertarget="severity-help-popover" aria-label="Show severity scoring logic">?</button>
               </span>
             </th>
-            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {% for a in recent_alerts %}
           <tr>
-            <td class="al-date"><a href="/alerts/{{ a.id }}">{{ a.received_display }}</a></td>
-            <td class="al-host">{{ a.hostname or a.computer_name or "—" }}</td>
-            <td class="al-threat">{{ a.threat_name or a.detection_name or "—" }}</td>
+            <td class="al-date" title="{{ a.received_display }}"><a href="/alerts/{{ a.id }}">{{ a.received_display }}</a></td>
+            <td class="al-host" title="{{ a.client_display or '' }}">{{ a.client_display or "—" }}</td>
+            <td class="al-host" title="{{ a.user_display or '' }}">{{ a.user_display or "—" }}</td>
+            <td class="al-threat" title="{{ a.machine_display or '' }}">{{ a.machine_display or "—" }}</td>
+            <td class="al-threat" title="{{ a.threat_name or a.detection_name or a.method_display or '' }}">{{ a.method_display or "—" }}</td>
+            <td class="al-status" title="{{ a.status_display or '' }}">{{ a.status_display or "—" }}</td>
             <td>
               <button
                 class="sev-tag sev-tag-button sev-{{ (a.severity or 'unknown') | lower }}"
@@ -175,13 +199,11 @@
                 data-reasons='{{ (a.score_reasons_list or []) | tojson }}'
               >{{ a.severity or "Unknown" }}</button>
             </td>
-            <td class="al-status">{{ a.status_display or "—" }}</td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="5" class="al-empty">
+            <td colspan="7" class="al-empty">
               <div class="empty-state empty-state-table">
-                <span class="empty-illustration" aria-hidden="true"></span>
                 <strong>No alerts in this view</strong>
                 <small>Try a wider date range or run a mailbox scan after confirming Graph access.</small>
                 <a class="empty-action" href="/settings">Review connection</a>
@@ -208,17 +230,15 @@
           <span class="esc-time">{{ msg.created_display }}</span>
         </div>
         <div class="esc-fields">
-          {% if msg.client_name %}<div class="esc-row"><span>Client</span><strong>{{ msg.client_name }}</strong></div>{% endif %}
+          {% if msg.client_name %}<div class="esc-row"><span>Client</span><strong>{{ msg.client_display or msg.client_name }}</strong></div>{% endif %}
           {% if msg.hostname %}<div class="esc-row"><span>Host</span><strong>{{ msg.hostname }}</strong></div>{% endif %}
           {% if msg.threat_name %}<div class="esc-row"><span>Threat</span><strong>{{ msg.threat_name }}</strong></div>{% endif %}
           {% if msg.domain %}<div class="esc-row"><span>Domain</span><strong>{{ msg.domain }}</strong></div>{% endif %}
           {% if msg.user_display %}<div class="esc-row"><span>User</span><strong>{{ msg.user_display }}</strong></div>{% endif %}
         </div>
-        <span class="esc-more">View details</span>
       </a>
       {% else %}
       <div class="empty-state esc-empty">
-        <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
         <strong>No escalations in this range</strong>
         <small>Critical cases and unresolved overrides will appear here as a chronological incident timeline.</small>
         <a class="empty-action" href="/dashboard?range={{ active_days }}&metric=critical">View critical clients</a>
