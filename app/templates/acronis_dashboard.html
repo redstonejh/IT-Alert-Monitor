@@ -100,7 +100,7 @@
   <div class="db-panel">
     <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">Alerts</span>
-      <span class="db-panel-count">0</span>
+      <span class="db-panel-count">{{ acronis_alerts | length }}</span>
     </div>
     <div class="db-panel-body">
       <table class="al-table">
@@ -114,15 +114,25 @@
           </tr>
         </thead>
         <tbody>
+          {% for alert in acronis_alerts %}
+          <tr>
+            <td class="al-date">{{ alert.received_display }}</td>
+            <td class="al-host">{{ alert.device or "—" }}</td>
+            <td class="al-threat">{{ alert.plan_name or alert.alert_type or "—" }}</td>
+            <td><span class="sev-tag sev-{{ (alert.severity or 'unknown') | lower }}">{{ alert.severity or "Unknown" }}</span></td>
+            <td class="al-status">{{ alert.alert_type or "—" }}</td>
+          </tr>
+          {% else %}
           <tr>
             <td colspan="5" class="al-empty">
               <div class="empty-state empty-state-table">
                 <span class="empty-illustration" aria-hidden="true"></span>
                 <strong>No alerts in this view</strong>
-                <small>Acronis alert rows will appear here once parsing is enabled.</small>
+                <small>Acronis alert rows will appear here once forwarded notification emails are scanned.</small>
               </div>
             </td>
           </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>

@@ -9,7 +9,7 @@ from app.storage import acronis_alert_exists, get_acronis_config, save_acronis_a
 
 logger = logging.getLogger(__name__)
 DEFAULT_LOOKBACK_DAYS = 60
-PARSING_ENABLED = False
+PARSING_ENABLED = True
 
 
 def _date_text(value: datetime) -> str:
