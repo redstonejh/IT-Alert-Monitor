@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
-from app.company_abbreviations import abbreviate_company
+from app.company_abbreviations import abbreviate_company, company_full_name
 from app.oauth import local_redirect_uri
 from app.scanner import DEFAULT_LOOKBACK_DAYS, run_scan, run_scan_range
 from app.storage import (
@@ -117,6 +117,14 @@ def _alert_company_display(row: dict) -> str:
     return _company_hint(domain) or _company_hint(row.get("hostname")) or _company_hint(row.get("computer_name")) or ""
 
 
+def _alert_company_full_display(row: dict) -> str:
+    client = str(row.get("client_name") or "").strip()
+    if client:
+        return company_full_name(client)
+    display = str(row.get("client_display") or _alert_company_display(row) or "").strip()
+    return company_full_name(display)
+
+
 def _alert_user_display(row: dict) -> str:
     _domain, user = _split_domain_user(row.get("username"))
     return user or str(row.get("hostname") or row.get("computer_name") or "").strip()
@@ -124,6 +132,17 @@ def _alert_user_display(row: dict) -> str:
 
 def _alert_machine_display(row: dict) -> str:
     return str(row.get("hostname") or row.get("computer_name") or "").strip()
+
+
+def _threat_type_display(row: dict) -> str:
+    raw = str(row.get("raw_email_body") or "").replace("\xa0", " ")
+    match = re.search(r"\bDetection type:\s*([^\r\n]+)", raw, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip().strip(".,;").title()
+    threat = str(row.get("threat_name") or row.get("detection_name") or "").strip()
+    if "/" in threat:
+        return threat.split("/", 1)[0].strip().title()
+    return ""
 
 
 def _threat_method_display(row: dict) -> str:
@@ -419,12 +438,15 @@ def _dashboard_visuals(alerts: list[dict], start: str, end: str) -> dict:
                 "pct": _chart_percent(count, total),
             }
         )
+    company_rows = _top_visual_rows(company_counts, total)
+    for row in company_rows:
+        row["full_label"] = company_full_name(row["label"])
     return {
         "total": total,
         "severity": severity_rows,
         "trend": _trend_visual_rows(alerts, start, end),
         "methods": _top_visual_rows(method_counts, total),
-        "companies": _top_visual_rows(company_counts, total),
+        "companies": company_rows,
     }
 
 
@@ -474,8 +496,10 @@ def dashboard(request: Request):
     for alert in recent_alerts:
         alert["received_display"] = _format_datetime(alert.get("received_time"))
         alert["client_display"] = _alert_company_display(alert)
+        alert["client_full_display"] = _alert_company_full_display(alert)
         alert["user_display"] = _alert_user_display(alert)
         alert["machine_display"] = _alert_machine_display(alert)
+        alert["type_display"] = _threat_type_display(alert)
         alert["method_display"] = _threat_method_display(alert)
         alert["score_reasons_list"] = _decode_reasons(alert.get("score_reasons"))
         alert["status_display"] = _status_keyword(alert)
@@ -484,8 +508,10 @@ def dashboard(request: Request):
             [
                 alert.get("received_display"),
                 alert.get("client_display"),
+                alert.get("client_full_display"),
                 alert.get("user_display"),
                 alert.get("machine_display"),
+                alert.get("type_display"),
                 alert.get("method_display"),
                 alert.get("status_display"),
                 alert.get("severity"),
@@ -508,6 +534,7 @@ def dashboard(request: Request):
     for message in teams_messages:
         message["created_display"] = _format_datetime(message.get("created_at"))
         message["client_display"] = abbreviate_company(message.get("client_name", ""))
+        message["client_full_display"] = company_full_name(message.get("client_name", "") or message.get("client_display", ""))
         message["reason_label"] = _escalation_title(message)
         message["domain"], message["user_display"] = _split_domain_user(message.get("username"))
         message["parsed"] = _parse_payload(message.get("payload", ""))

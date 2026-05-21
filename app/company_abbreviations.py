@@ -77,6 +77,27 @@ def company_abbreviation(company_name: str) -> str:
     return ""
 
 
+def company_full_name(company_name_or_abbreviation: str) -> str:
+    text = str(company_name_or_abbreviation or "").strip()
+    if not text:
+        return ""
+    sorted_entries = sorted(_entries(), key=lambda entry: len(_normalize(entry.name)), reverse=True)
+    for entry in sorted_entries:
+        if text.lower() == entry.abbreviation.lower():
+            return entry.name
+    for candidate in _candidate_names(text):
+        candidate_keys = [key for key in (_normalize(candidate), _without_drop_words(candidate)) if key]
+        for entry in sorted_entries:
+            entry_keys = {_normalize(entry.name), _without_drop_words(entry.name)}
+            if any(key and key in entry_keys for key in candidate_keys):
+                return entry.name
+        for entry in sorted_entries:
+            entry_keys = {_normalize(entry.name), _without_drop_words(entry.name)}
+            if any(key and any(key in candidate_key or candidate_key in key for candidate_key in candidate_keys) for key in entry_keys):
+                return entry.name
+    return text
+
+
 def abbreviate_company(company_name: str) -> str:
     text = str(company_name or "").strip()
     if not text:

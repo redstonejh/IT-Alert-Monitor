@@ -59,6 +59,7 @@
       <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
       <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
     </button>
+    <button class="panel-reset-button" type="button" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
     <a class="cmd-btn" href="/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if config.oauth_account or config.mailbox_address %}
     <form method="post" action="/settings/disconnect">
@@ -154,10 +155,12 @@
   </a>
 </div>
 
-<section class="db-panel analytics-panel db-panel-collapsed" data-collapse-default="closed">
+<div class="panel-layout" data-layout-key="eset">
+<section class="db-panel analytics-panel db-panel-collapsed" data-collapse-default="closed" data-panel-key="eset-analytics" data-default-span="12">
   <div class="db-panel-hd db-panel-hd-analytics">
     <span class="db-panel-title">Analytics</span>
     <span class="db-panel-count">{{ visualizations.total }}</span>
+    <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
   </div>
   <div class="db-panel-body analytics-panel-body">
     <div class="viz-band" aria-label="ESET alert visualizations">
@@ -207,7 +210,7 @@
           <strong>{{ visualizations.methods | length }}</strong>
         </div>
         {% for item in visualizations.methods %}
-        <div class="viz-rank-row" title="{{ item.label }}: {{ item.count }}">
+        <div class="viz-rank-row" title="{{ item.full_label or item.label }}: {{ item.count }}">
           <div><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
           <b><i style="width: {{ item.pct }}%"></i></b>
         </div>
@@ -234,21 +237,21 @@
   </div>
 </section>
 
-<div class="db-grid">
-
-  <div class="db-panel">
+  <div class="db-panel" data-panel-key="eset-alerts" data-default-span="8">
     <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">{{ metric_label }}</span>
       <span class="db-panel-count">{{ recent_alerts | length }}</span>
+      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
     </div>
     <div class="db-panel-body">
-      <table class="al-table">
+      <table class="al-table eset-alert-table">
         <thead>
           <tr>
             <th>Received (PT)</th>
             <th>Company</th>
             <th>User</th>
             <th>Machine</th>
+            <th>Type</th>
             <th>Method</th>
             <th>Status</th>
             <th>
@@ -263,9 +266,10 @@
           {% for a in recent_alerts %}
           <tr class="alert-row alert-row-{{ (a.severity or 'unknown') | lower }}">
             <td class="al-date" title="{{ a.received_display }}"><a href="/alerts/{{ a.id }}">{{ a.received_display }}</a></td>
-            <td class="al-host" title="{{ a.client_display or '' }}">{{ a.client_display or "—" }}</td>
+            <td class="al-host" title="{{ a.client_full_display or a.client_display or '' }}">{{ a.client_display or "—" }}</td>
             <td class="al-host" title="{{ a.user_display or '' }}">{{ a.user_display or "—" }}</td>
             <td class="al-threat" title="{{ a.machine_display or '' }}">{{ a.machine_display or "—" }}</td>
+            <td class="al-threat" title="{{ a.type_display or '' }}">{{ a.type_display or "—" }}</td>
             <td class="al-threat" title="{{ a.threat_name or a.detection_name or a.method_display or '' }}">{{ a.method_display or "—" }}</td>
             <td class="al-status" title="{{ a.status_display or '' }}">{{ a.status_display or "—" }}</td>
             <td>
@@ -280,7 +284,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" class="al-empty">
+            <td colspan="8" class="al-empty">
               <div class="empty-state empty-state-table">
                 <strong>No alerts in this view</strong>
                 <small>Try a wider date range or run a mailbox scan after confirming Graph access.</small>
@@ -294,10 +298,11 @@
     </div>
   </div>
 
-  <div class="db-panel">
+  <div class="db-panel" data-panel-key="eset-escalations" data-default-span="4">
     <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">{{ teams_messages | length }}</span>
+      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
     </div>
     <div class="db-panel-body esc-feed {% if teams_messages %}esc-timeline{% else %}esc-timeline-empty{% endif %}">
       {% for msg in teams_messages %}
@@ -308,7 +313,7 @@
           <span class="esc-time">{{ msg.created_display }}</span>
         </div>
         <div class="esc-fields">
-          {% if msg.client_name %}<div class="esc-row"><span>Client</span><strong>{{ msg.client_display or msg.client_name }}</strong></div>{% endif %}
+          {% if msg.client_name %}<div class="esc-row"><span>Client</span><strong title="{{ msg.client_full_display or msg.client_name }}">{{ msg.client_display or msg.client_name }}</strong></div>{% endif %}
           {% if msg.hostname %}<div class="esc-row"><span>Host</span><strong>{{ msg.hostname }}</strong></div>{% endif %}
           {% if msg.threat_name %}<div class="esc-row"><span>Threat</span><strong>{{ msg.threat_name }}</strong></div>{% endif %}
           {% if msg.domain %}<div class="esc-row"><span>Domain</span><strong>{{ msg.domain }}</strong></div>{% endif %}

@@ -184,22 +184,233 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  document.querySelectorAll(".db-panel").forEach((panel) => {
-    const header = panel.querySelector(".db-panel-hd");
-    const body = panel.querySelector(".db-panel-body");
-    if (!header || !body) return;
-    header.setAttribute("role", "button");
-    header.setAttribute("tabindex", "0");
-    header.setAttribute("aria-expanded", (!panel.classList.contains("db-panel-collapsed")).toString());
-    const togglePanel = () => {
-      const collapsed = panel.classList.toggle("db-panel-collapsed");
-      header.setAttribute("aria-expanded", (!collapsed).toString());
-    };
-    header.addEventListener("click", togglePanel);
-    header.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      togglePanel();
+  const panelStoragePrefix = "dashboard-panel-layout:";
+  const updatePanelLockButton = (panel, unlocked) => {
+    const button = panel.querySelector(".panel-lock-toggle");
+    if (!button) return;
+    button.setAttribute("aria-pressed", unlocked.toString());
+    button.setAttribute("aria-label", unlocked ? "Lock panel movement" : "Unlock panel movement");
+    button.title = unlocked ? "Lock panel movement" : "Unlock panel movement";
+  };
+
+  const applyPanelSpan = (panel, span) => {
+    const safeSpan = Math.max(3, Math.min(12, Number(span) || Number(panel.dataset.defaultSpan) || 12));
+    panel.style.gridColumn = `span ${safeSpan}`;
+    panel.dataset.currentSpan = String(safeSpan);
+  };
+
+  const savePanelLayouts = (layout) => {
+    const layoutKey = layout.dataset.layoutKey || "default";
+    [...layout.querySelectorAll(":scope > .db-panel")].forEach((panel, index) => {
+      const key = panel.dataset.panelKey;
+      if (!key) return;
+      try {
+        localStorage.setItem(`${panelStoragePrefix}${layoutKey}:${key}`, JSON.stringify({
+          order: index,
+          span: Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12,
+          height: panel.style.height ? parseFloat(panel.style.height) : null,
+          unlocked: panel.classList.contains("db-panel-unlocked"),
+        }));
+      } catch {}
+    });
+  };
+
+  const setPanelUnlocked = (panel, unlocked, layout) => {
+    panel.classList.toggle("db-panel-unlocked", unlocked);
+    updatePanelLockButton(panel, unlocked);
+    savePanelLayouts(layout);
+  };
+
+  document.querySelectorAll(".panel-layout").forEach((layout) => {
+    const layoutKey = layout.dataset.layoutKey || "default";
+    const panels = [...layout.querySelectorAll(":scope > .db-panel")];
+    const savedByPanel = new Map();
+    panels.forEach((panel, index) => {
+      const key = panel.dataset.panelKey || `panel-${index}`;
+      panel.dataset.defaultOrder = String(index);
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(`${panelStoragePrefix}${layoutKey}:${key}`) || "null");
+      } catch {}
+      savedByPanel.set(panel, saved);
+      panel.style.order = String(saved?.order ?? index);
+      applyPanelSpan(panel, saved?.span ?? panel.dataset.defaultSpan ?? 12);
+      if (saved?.height) panel.style.height = `${Math.max(80, Number(saved.height))}px`;
+      if (saved?.unlocked) panel.classList.add("db-panel-unlocked");
+      updatePanelLockButton(panel, panel.classList.contains("db-panel-unlocked"));
+      if (!panel.querySelector(".panel-resize-handle")) {
+        const handle = document.createElement("span");
+        handle.className = "panel-resize-handle";
+        handle.setAttribute("aria-hidden", "true");
+        panel.appendChild(handle);
+      }
+    });
+
+    panels
+      .sort((a, b) => Number(a.style.order || 0) - Number(b.style.order || 0))
+      .forEach((panel) => layout.appendChild(panel));
+
+    panels.forEach((panel) => {
+      const header = panel.querySelector(".db-panel-hd");
+      const body = panel.querySelector(".db-panel-body");
+      const lockButton = panel.querySelector(".panel-lock-toggle");
+      const resizeHandle = panel.querySelector(".panel-resize-handle");
+      if (!header || !body) return;
+      let movedDuringPointer = false;
+
+      lockButton?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setPanelUnlocked(panel, !panel.classList.contains("db-panel-unlocked"), layout);
+      });
+
+      header.setAttribute("role", "button");
+      header.setAttribute("tabindex", "0");
+      header.setAttribute("aria-expanded", (!panel.classList.contains("db-panel-collapsed")).toString());
+      const togglePanel = () => {
+        if (movedDuringPointer) {
+          movedDuringPointer = false;
+          return;
+        }
+        const collapsed = panel.classList.toggle("db-panel-collapsed");
+        header.setAttribute("aria-expanded", (!collapsed).toString());
+        savePanelLayouts(layout);
+      };
+      header.addEventListener("click", togglePanel);
+      header.addEventListener("keydown", (event) => {
+        if (event.target?.closest?.(".panel-lock-toggle")) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        togglePanel();
+      });
+
+      header.addEventListener("pointerdown", (event) => {
+        if (!panel.classList.contains("db-panel-unlocked")) return;
+        if (event.button !== 0 || event.target.closest("button, a, input, textarea, select, [popover]")) return;
+        const startX = event.clientX;
+        const startY = event.clientY;
+        let rect = null;
+        let placeholder = null;
+        let offsetX = 0;
+        let offsetY = 0;
+        let dragged = false;
+
+        const startDrag = () => {
+          if (dragged) return;
+          dragged = true;
+          rect = panel.getBoundingClientRect();
+          placeholder = document.createElement("div");
+          placeholder.className = "db-panel-placeholder";
+          placeholder.style.gridColumn = panel.style.gridColumn || `span ${panel.dataset.currentSpan || panel.dataset.defaultSpan || 12}`;
+          placeholder.style.height = `${Math.max(72, rect.height)}px`;
+          layout.insertBefore(placeholder, panel);
+          panel.classList.add("db-panel-dragging");
+          panel.style.width = `${rect.width}px`;
+          panel.style.height = `${rect.height}px`;
+          panel.style.left = `${rect.left}px`;
+          panel.style.top = `${rect.top}px`;
+          offsetX = startX - rect.left;
+          offsetY = startY - rect.top;
+        };
+
+        const onPointerMove = (moveEvent) => {
+          const dx = moveEvent.clientX - startX;
+          const dy = moveEvent.clientY - startY;
+          if (!dragged && Math.hypot(dx, dy) < 6) return;
+          startDrag();
+          moveEvent.preventDefault();
+          const nextLeft = moveEvent.clientX - offsetX;
+          const nextTop = moveEvent.clientY - offsetY;
+          panel.style.left = `${Math.round(nextLeft)}px`;
+          panel.style.top = `${Math.round(nextTop)}px`;
+          const target = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest?.(".db-panel");
+          if (!target || target === panel || target.parentElement !== layout) return;
+          const targetRect = target.getBoundingClientRect();
+          const before = moveEvent.clientY < targetRect.top + targetRect.height / 2;
+          layout.insertBefore(placeholder, before ? target : target.nextSibling);
+        };
+
+        const onPointerUp = () => {
+          if (dragged && placeholder) {
+            panel.classList.remove("db-panel-dragging");
+            panel.style.left = "";
+            panel.style.top = "";
+            panel.style.width = "";
+            layout.insertBefore(panel, placeholder);
+            placeholder.remove();
+            [...layout.querySelectorAll(":scope > .db-panel")].forEach((item, index) => {
+              item.style.order = String(index);
+            });
+            savePanelLayouts(layout);
+          }
+          movedDuringPointer = dragged;
+          window.setTimeout(() => {
+            movedDuringPointer = false;
+          }, 0);
+          document.removeEventListener("pointermove", onPointerMove);
+          document.removeEventListener("pointerup", onPointerUp);
+          document.removeEventListener("pointercancel", onPointerUp);
+        };
+
+        document.addEventListener("pointermove", onPointerMove);
+        document.addEventListener("pointerup", onPointerUp);
+        document.addEventListener("pointercancel", onPointerUp);
+      });
+
+      resizeHandle?.addEventListener("pointerdown", (event) => {
+        if (!panel.classList.contains("db-panel-unlocked")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const startRect = panel.getBoundingClientRect();
+        const startSpan = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12;
+        const columnWidth = Math.max(1, layout.getBoundingClientRect().width / 12);
+
+        const onResizeMove = (moveEvent) => {
+          const nextSpan = Math.round(startSpan + ((moveEvent.clientX - startX) / columnWidth));
+          applyPanelSpan(panel, nextSpan);
+          panel.style.height = `${Math.max(92, Math.round(startRect.height + (moveEvent.clientY - startY)))}px`;
+        };
+
+        const onResizeEnd = () => {
+          savePanelLayouts(layout);
+          document.removeEventListener("pointermove", onResizeMove);
+          document.removeEventListener("pointerup", onResizeEnd);
+          document.removeEventListener("pointercancel", onResizeEnd);
+        };
+
+        document.addEventListener("pointermove", onResizeMove);
+        document.addEventListener("pointerup", onResizeEnd);
+        document.addEventListener("pointercancel", onResizeEnd);
+      });
+    });
+  });
+
+  document.querySelectorAll(".panel-reset-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const layouts = [...document.querySelectorAll(".panel-layout")];
+      try {
+        Object.keys(localStorage)
+          .filter((key) => key.startsWith(panelStoragePrefix))
+          .forEach((key) => localStorage.removeItem(key));
+      } catch {}
+      layouts.forEach((layout) => {
+        [...layout.querySelectorAll(":scope > .db-panel")]
+          .sort((a, b) => Number(a.dataset.defaultOrder || 0) - Number(b.dataset.defaultOrder || 0))
+          .forEach((panel, index) => {
+            panel.classList.remove("db-panel-unlocked", "db-panel-dragging");
+            panel.style.order = String(index);
+            panel.style.gridColumn = "";
+            panel.style.height = "";
+            panel.style.left = "";
+            panel.style.top = "";
+            panel.style.width = "";
+            applyPanelSpan(panel, panel.dataset.defaultSpan || 12);
+            layout.appendChild(panel);
+            updatePanelLockButton(panel, false);
+          });
+      });
+      showToast("Panel layout reset.");
     });
   });
 

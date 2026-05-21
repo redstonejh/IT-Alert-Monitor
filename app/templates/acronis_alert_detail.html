@@ -33,7 +33,7 @@
   </article>
   <article>
     <span>Company</span>
-    <strong>{{ alert.company_display or "Not found" }}</strong>
+    <strong title="{{ alert.company_full_display or alert.company_display or '' }}">{{ alert.company_display or "Not found" }}</strong>
   </article>
   <article>
     <span>Machine</span>
@@ -55,7 +55,7 @@
     </div>
     <dl class="detail-list detail-list-featured">
       <dt>Date</dt><dd>{{ alert.date_display or "Not found" }}</dd>
-      <dt>Company</dt><dd>{{ alert.company_display or "Not found" }}</dd>
+      <dt>Company</dt><dd title="{{ alert.company_full_display or alert.company_display or '' }}">{{ alert.company_display or "Not found" }}</dd>
       <dt>Machine</dt><dd>{{ alert.machine_display or alert.device or "Not found" }}</dd>
       <dt>Backup</dt><dd>{{ alert.backup_failed_display }}</dd>
       <dt>Reason</dt><dd>{{ alert.reason_display or alert.reason or "Not found" }}</dd>

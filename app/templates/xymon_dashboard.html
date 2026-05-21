@@ -51,6 +51,7 @@
       <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
       <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
     </button>
+    <button class="panel-reset-button" type="button" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
     <a class="cmd-btn" href="/xymon/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if xymon_config.mailbox_address %}
     <form method="post" action="/xymon/settings/disconnect">
@@ -121,11 +122,12 @@
   </a>
 </div>
 
-<div class="db-grid">
-  <div class="db-panel">
+<div class="panel-layout" data-layout-key="xymon">
+  <div class="db-panel" data-panel-key="xymon-alerts" data-default-span="8">
     <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">{{ metric_label }}</span>
       <span class="db-panel-count">{{ xymon_alerts | length }}</span>
+      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
     </div>
     <div class="db-panel-body">
       <table class="al-table">
@@ -165,10 +167,11 @@
     </div>
   </div>
 
-  <div class="db-panel">
+  <div class="db-panel" data-panel-key="xymon-escalations" data-default-span="4">
     <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">0</span>
+      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
     </div>
     <div class="db-panel-body esc-feed esc-timeline-empty">
       <div class="empty-state esc-empty">

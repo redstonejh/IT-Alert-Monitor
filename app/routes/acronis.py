@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
 from app.acronis_scanner import DEFAULT_LOOKBACK_DAYS, run_acronis_scan, run_acronis_scan_range
-from app.company_abbreviations import abbreviate_company
+from app.company_abbreviations import abbreviate_company, company_full_name
 from app.storage import (
     get_acronis_alert,
     get_acronis_config,
@@ -301,6 +301,19 @@ def _company_display(row: dict) -> str:
         or "Unknown"
     ).strip()
     return abbreviate_company(company)
+
+
+def _company_full_display(row: dict) -> str:
+    text = _raw_text(row)
+    company = str(
+        row.get("alert_group")
+        or row.get("account")
+        or _label_value("Group", text)
+        or _label_value("Account", text)
+        or row.get("company_display")
+        or "Unknown"
+    ).strip()
+    return company_full_name(company)
 
 
 def _alert_date_display(row: dict) -> str:
@@ -732,6 +745,7 @@ def acronis_dashboard(request: Request):
         row["received_display"] = _format_datetime(row.get("received_time"))
         row["date_display"] = _alert_date_display(row)
         row["company_display"] = _company_display(row)
+        row["company_full_display"] = _company_full_display(row)
         row["machine_display"] = _machine_display(row)
         row["backup_failed_display"] = _backup_failed_display(_backup_failed_value(row))
         row["reason_display"] = _reason_display(row)
@@ -765,6 +779,7 @@ def acronis_dashboard(request: Request):
                 row.get("received_display"),
                 row.get("date_display"),
                 row.get("company_display"),
+                row.get("company_full_display"),
                 row.get("machine_display"),
                 row.get("backup_failed_display"),
                 row.get("reason_display"),
@@ -793,6 +808,7 @@ def acronis_dashboard(request: Request):
     for item in acronis_escalations:
         item["created_display"] = _format_datetime(item.get("last_alerted_at") or item.get("created_at"))
         item["company_display"] = _company_display(item)
+        item["company_full_display"] = _company_full_display(item)
         item["machine_display"] = _machine_display(item)
         item["backup_failed_display"] = _backup_failed_display(_backup_failed_value(item))
         item["reason_display"] = _reason_display(item)
@@ -834,6 +850,7 @@ def acronis_alert_detail(request: Request, alert_id: int):
     alert["received_display"] = _format_datetime(alert.get("received_time"))
     alert["date_display"] = _alert_date_display(alert)
     alert["company_display"] = _company_display(alert)
+    alert["company_full_display"] = _company_full_display(alert)
     alert["machine_display"] = _machine_display(alert)
     alert["backup_failed_display"] = _backup_failed_display(_backup_failed_value(alert))
     alert["reason_display"] = _reason_display(alert)

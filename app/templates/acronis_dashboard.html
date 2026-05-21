@@ -51,6 +51,7 @@
       <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
       <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
     </button>
+    <button class="panel-reset-button" type="button" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
     <a class="cmd-btn" href="/acronis/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if acronis_config.mailbox_address %}
     <form method="post" action="/acronis/settings/disconnect">
@@ -126,11 +127,12 @@
   </a>
 </div>
 
-<div class="db-grid">
-  <div class="db-panel">
+<div class="panel-layout" data-layout-key="acronis">
+  <div class="db-panel" data-panel-key="acronis-alerts" data-default-span="8">
     <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">{{ metric_label }}</span>
       <span class="db-panel-count">{{ acronis_alerts | length }}</span>
+      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
     </div>
     <div class="db-panel-body">
       <table class="al-table acr-eset-table">
@@ -153,7 +155,7 @@
           {% for alert in acronis_alerts %}
           <tr class="alert-row alert-row-{{ alert.derived_severity_class }}">
             <td class="al-date" title="{{ alert.date_display or '' }}"><a href="/acronis/alerts/{{ alert.id }}">{{ alert.date_display or "—" }}</a></td>
-            <td class="al-host" title="{{ alert.company_display or '' }}">{{ alert.company_display or "Unknown" }}</td>
+            <td class="al-host" title="{{ alert.company_full_display or alert.company_display or '' }}">{{ alert.company_display or "Unknown" }}</td>
             <td class="al-threat" title="{{ alert.machine_display or '' }}">{{ alert.machine_display or "Unknown" }}</td>
             <td class="al-status" title="{{ alert.backup_failed_display }}">{{ alert.backup_failed_display }}</td>
             <td class="al-status" title="{{ alert.reason_display or '' }}">{{ alert.reason_display or "—" }}</td>
@@ -184,10 +186,11 @@
     </div>
   </div>
 
-  <div class="db-panel">
+  <div class="db-panel" data-panel-key="acronis-escalations" data-default-span="4">
     <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">{{ acronis_escalations | length }}</span>
+      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
     </div>
     <div class="db-panel-body esc-feed {% if acronis_escalations %}esc-timeline{% else %}esc-timeline-empty{% endif %}">
       {% for msg in acronis_escalations %}
@@ -198,7 +201,7 @@
           <span class="esc-time">{{ msg.created_display }}</span>
         </div>
         <div class="esc-fields">
-          <div class="esc-row"><span>Company</span><strong>{{ msg.company_display }}</strong></div>
+          <div class="esc-row"><span>Company</span><strong title="{{ msg.company_full_display or msg.company_display }}">{{ msg.company_display }}</strong></div>
           <div class="esc-row"><span>Machine</span><strong>{{ msg.machine_display }}</strong></div>
           <div class="esc-row"><span>Backup</span><strong>{{ msg.backup_failed_display }}</strong></div>
           <div class="esc-row"><span>Why</span><strong>{{ msg.reason_display }}</strong></div>

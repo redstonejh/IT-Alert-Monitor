@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <header class="app-nav settings-nav">
-  <a class="app-nav-brand" href="/xymon" aria-label="Xymon Monitor dashboard">
-    <span class="app-logo app-logo-xymon" aria-hidden="true">X</span>
-    <span>
+  <div class="settings-brand-group">
+    <a class="settings-brand-switch settings-brand-xymon" href="/xymon" aria-label="Xymon dashboard">Xymon</a>
+    <span class="settings-brand-copy">
       <strong>Configure</strong>
       <small>Xymon Monitor settings</small>
     </span>
-  </a>
+  </div>
   <div class="app-nav-status" aria-label="Configuration status">
     <div class="nav-status-item">
       <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>

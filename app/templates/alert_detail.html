@@ -1,14 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
 {% set severity = alert.severity or "Unknown" %}
-{% set endpoint = alert.hostname or alert.computer_name or "Unknown endpoint" %}
+{% set endpoint = alert.endpoint_display or alert.hostname or alert.computer_name or "Unknown endpoint" %}
 {% set threat = alert.threat_name or alert.detection_name or "Alert detail" %}
 
-<section class="alert-hero">
+<section class="alert-hero alert-detail-hero">
   <div class="alert-hero-copy">
     <span class="db-brand-label">Alert detail</span>
-    <h1>{{ threat }}</h1>
-    <p>{{ endpoint }} · {{ alert.received_time }}</p>
+    <h1 title="{{ threat }}">{{ threat }}</h1>
+    <p class="alert-hero-meta">
+      <span title="{{ endpoint }}">{{ endpoint }}</span>
+      <span>{{ alert.received_display or alert.received_time }}</span>
+    </p>
   </div>
   <a class="cmd-btn cmd-btn-ghost" href="/dashboard">Back to dashboard</a>
 </section>
@@ -28,7 +31,7 @@
   </article>
   <article>
     <span>Status</span>
-    <strong>{{ alert.containment_status or alert.resolved_status or "Not found" }}</strong>
+    <strong>{{ alert.status_display or alert.containment_status or alert.resolved_status or "Not found" }}</strong>
   </article>
 </section>
 
@@ -43,6 +46,8 @@
     <dl class="detail-list detail-list-featured">
       <dt>Threat</dt><dd>{{ alert.threat_name or "Not found" }}</dd>
       <dt>Detection</dt><dd>{{ alert.detection_name or "Not found" }}</dd>
+      <dt>Type</dt><dd>{{ alert.type_display or "Not found" }}</dd>
+      <dt>Method</dt><dd>{{ alert.method_display or "Not found" }}</dd>
       <dt>Subject</dt><dd>{{ alert.subject or "Not found" }}</dd>
       <dt>Scan type</dt><dd>{{ alert.scan_type or "Not found" }}</dd>
       <dt>Score</dt><dd>{{ alert.score if alert.score is not none else "Not scored" }}</dd>
@@ -71,7 +76,7 @@
       </div>
     </div>
     <dl class="detail-list">
-      <dt>Client</dt><dd>{{ alert.client_display or alert.client_name or "Not found" }}</dd>
+      <dt>Client</dt><dd title="{{ alert.client_full_display or alert.client_name or '' }}">{{ alert.client_display or alert.client_name or "Not found" }}</dd>
       <dt>Hostname</dt><dd>{{ alert.hostname or "Not found" }}</dd>
       <dt>Computer</dt><dd>{{ alert.computer_name or "Not found" }}</dd>
       <dt>User</dt><dd>{{ alert.username or "Not found" }}</dd>
@@ -96,7 +101,7 @@
         <tbody>
           {% for match in matches %}
             <tr>
-              <td>{{ match.received_time }}</td>
+              <td>{{ match.received_display or match.received_time }}</td>
               <td>{{ match.hostname or match.computer_name or "Unknown" }}</td>
               <td>{{ match.threat_name or match.detection_name or "Unknown" }}</td>
               <td><span class="sev-tag sev-{{ (match.severity or 'unknown') | lower }}">{{ match.severity or "Unknown" }}</span></td>
