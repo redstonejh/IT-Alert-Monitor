@@ -7,7 +7,7 @@
 <header class="app-nav">
   <div class="app-nav-brand-group">
     <div class="dash-switcher">
-      <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
+      <button class="dash-switch-btn dash-switch-hero dash-switch-hero-xymon" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
         Xymon <span class="dash-switch-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dash-switch-menu" id="dash-switch-menu">
@@ -22,12 +22,6 @@
         </a>
       </div>
     </div>
-    <a class="app-nav-brand" href="/xymon" aria-label="Xymon Monitor dashboard">
-      <span>
-        <strong>Xymon Monitor</strong>
-        <small>Infrastructure status dashboard</small>
-      </span>
-    </a>
   </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
     <div class="nav-status-item">
@@ -53,6 +47,10 @@
     {% elif request.query_params.get("scanned") and request.query_params.get("scanned") != "0" %}
       <span class="cmd-badge">{{ request.query_params.get("scanned") }} new</span>
     {% endif %}
+    <button class="theme-toggle" type="button" aria-label="Switch dashboard theme" title="Toggle dark mode">
+      <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
+      <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
+    </button>
     <a class="cmd-btn" href="/xymon/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if xymon_config.mailbox_address %}
     <form method="post" action="/xymon/settings/disconnect">
@@ -142,7 +140,7 @@
         </thead>
         <tbody>
           {% for alert in xymon_alerts %}
-          <tr>
+          <tr class="alert-row alert-row-{{ alert.status_class | replace('sev-xymon-', '') }}">
             <td class="al-date" title="{{ alert.received_display or '' }}"><a href="/xymon/alerts/{{ alert.id }}">{{ alert.received_display or "—" }}</a></td>
             <td class="al-host" title="{{ alert.host or '' }}">{{ alert.host or "Unknown host" }}</td>
             <td class="al-threat" title="{{ alert.test_name or '' }}">{{ alert.test_name or "Unknown test" }}</td>

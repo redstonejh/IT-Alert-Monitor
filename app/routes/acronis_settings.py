@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.acronis_scanner import run_acronis_scan
-from app.routes.acronis import _format_datetime
+from app.routes.acronis import ACRONIS_TRIAGE_DEFAULTS, _acronis_triage_config, _format_datetime
 from app.security import mask_secret
 from app.storage import (
     delete_setting,
@@ -38,6 +38,7 @@ def acronis_settings_page(request: Request):
         "escalation_cooldown_hours": shared.escalation_cooldown_hours,
         "last_scan_display": last_scan_display,
     }
+    display.update(_acronis_triage_config())
     return templates.TemplateResponse(
         "acronis_settings.html", {"request": request, "config": display}
     )
@@ -56,6 +57,35 @@ def save_acronis_settings(
     acronis_sender_filter: str = Form(""),
     acronis_subject_filter: str = Form(""),
     acronis_taxonomy_scores: str = Form(""),
+    acronis_triage_critical_threshold: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_critical_threshold"]),
+    acronis_triage_high_threshold: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_high_threshold"]),
+    acronis_triage_medium_threshold: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_medium_threshold"]),
+    acronis_triage_status_critical: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_status_critical"]),
+    acronis_triage_status_error: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_status_error"]),
+    acronis_triage_status_warning: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_status_warning"]),
+    acronis_triage_status_information: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_status_information"]),
+    acronis_triage_storage_failure: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_storage_failure"]),
+    acronis_triage_repository_failure: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_repository_failure"]),
+    acronis_triage_capacity_full: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_capacity_full"]),
+    acronis_triage_auth_or_license: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_auth_or_license"]),
+    acronis_triage_agent_or_service_down: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_agent_or_service_down"]),
+    acronis_triage_transient_maintenance: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_transient_maintenance"]),
+    acronis_triage_backup_failed_generic: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_backup_failed_generic"]),
+    acronis_triage_connectivity: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_connectivity"]),
+    acronis_triage_stale_offline: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_stale_offline"]),
+    acronis_triage_success_or_info: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_success_or_info"]),
+    acronis_triage_unknown: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_unknown"]),
+    acronis_triage_backup_failed_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_backup_failed_adjustment"]),
+    acronis_triage_backup_not_failed_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_backup_not_failed_adjustment"]),
+    acronis_triage_server_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_server_adjustment"]),
+    acronis_triage_endpoint_connectivity_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_endpoint_connectivity_adjustment"]),
+    acronis_triage_maintenance_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_maintenance_adjustment"]),
+    acronis_triage_new_pattern_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_new_pattern_adjustment"]),
+    acronis_triage_repeat_pattern_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_repeat_pattern_adjustment"]),
+    acronis_triage_spread_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_spread_adjustment"]),
+    acronis_triage_offline_7_day_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_offline_7_day_adjustment"]),
+    acronis_triage_offline_14_day_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_offline_14_day_adjustment"]),
+    acronis_triage_offline_30_day_adjustment: int = Form(ACRONIS_TRIAGE_DEFAULTS["acronis_triage_offline_30_day_adjustment"]),
 ):
     save_acronis_config(
         {
@@ -70,6 +100,35 @@ def save_acronis_settings(
             "acronis_sender_filter": acronis_sender_filter,
             "acronis_subject_filter": acronis_subject_filter,
             "acronis_taxonomy_scores": acronis_taxonomy_scores.strip(),
+            "acronis_triage_critical_threshold": acronis_triage_critical_threshold,
+            "acronis_triage_high_threshold": acronis_triage_high_threshold,
+            "acronis_triage_medium_threshold": acronis_triage_medium_threshold,
+            "acronis_triage_status_critical": acronis_triage_status_critical,
+            "acronis_triage_status_error": acronis_triage_status_error,
+            "acronis_triage_status_warning": acronis_triage_status_warning,
+            "acronis_triage_status_information": acronis_triage_status_information,
+            "acronis_triage_storage_failure": acronis_triage_storage_failure,
+            "acronis_triage_repository_failure": acronis_triage_repository_failure,
+            "acronis_triage_capacity_full": acronis_triage_capacity_full,
+            "acronis_triage_auth_or_license": acronis_triage_auth_or_license,
+            "acronis_triage_agent_or_service_down": acronis_triage_agent_or_service_down,
+            "acronis_triage_transient_maintenance": acronis_triage_transient_maintenance,
+            "acronis_triage_backup_failed_generic": acronis_triage_backup_failed_generic,
+            "acronis_triage_connectivity": acronis_triage_connectivity,
+            "acronis_triage_stale_offline": acronis_triage_stale_offline,
+            "acronis_triage_success_or_info": acronis_triage_success_or_info,
+            "acronis_triage_unknown": acronis_triage_unknown,
+            "acronis_triage_backup_failed_adjustment": acronis_triage_backup_failed_adjustment,
+            "acronis_triage_backup_not_failed_adjustment": acronis_triage_backup_not_failed_adjustment,
+            "acronis_triage_server_adjustment": acronis_triage_server_adjustment,
+            "acronis_triage_endpoint_connectivity_adjustment": acronis_triage_endpoint_connectivity_adjustment,
+            "acronis_triage_maintenance_adjustment": acronis_triage_maintenance_adjustment,
+            "acronis_triage_new_pattern_adjustment": acronis_triage_new_pattern_adjustment,
+            "acronis_triage_repeat_pattern_adjustment": acronis_triage_repeat_pattern_adjustment,
+            "acronis_triage_spread_adjustment": acronis_triage_spread_adjustment,
+            "acronis_triage_offline_7_day_adjustment": acronis_triage_offline_7_day_adjustment,
+            "acronis_triage_offline_14_day_adjustment": acronis_triage_offline_14_day_adjustment,
+            "acronis_triage_offline_30_day_adjustment": acronis_triage_offline_30_day_adjustment,
         }
     )
     save_config(

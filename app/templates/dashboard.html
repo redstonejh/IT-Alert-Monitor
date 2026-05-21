@@ -11,7 +11,7 @@
 <header class="app-nav">
   <div class="app-nav-brand-group">
     <div class="dash-switcher">
-      <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
+      <button class="dash-switch-btn dash-switch-hero" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
         ESET <span class="dash-switch-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dash-switch-menu" id="dash-switch-menu">
@@ -26,12 +26,6 @@
         </a>
       </div>
     </div>
-    <a class="app-nav-brand" href="/dashboard" aria-label="ESET Alert Monitor dashboard">
-      <span>
-        <strong>ESET Alert Monitor</strong>
-        <small>Security operations dashboard</small>
-      </span>
-    </a>
   </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
     <div class="nav-status-item">
@@ -61,6 +55,10 @@
     {% elif request.query_params.get("scan_failed") %}
       <span class="cmd-badge cmd-badge-warn">Scan failed</span>
     {% endif %}
+    <button class="theme-toggle" type="button" aria-label="Switch dashboard theme" title="Toggle dark mode">
+      <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
+      <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
+    </button>
     <a class="cmd-btn" href="/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if config.oauth_account or config.mailbox_address %}
     <form method="post" action="/settings/disconnect">
@@ -156,6 +154,86 @@
   </a>
 </div>
 
+<section class="db-panel analytics-panel db-panel-collapsed" data-collapse-default="closed">
+  <div class="db-panel-hd db-panel-hd-analytics">
+    <span class="db-panel-title">Analytics</span>
+    <span class="db-panel-count">{{ visualizations.total }}</span>
+  </div>
+  <div class="db-panel-body analytics-panel-body">
+    <div class="viz-band" aria-label="ESET alert visualizations">
+      <article class="viz-panel">
+        <div class="viz-head">
+          <span>Severity mix</span>
+          <strong>{{ visualizations.total }}</strong>
+        </div>
+        {% if visualizations.total %}
+        <div class="viz-stack" aria-label="Severity distribution">
+          {% for item in visualizations.severity %}
+            {% if item.count %}
+            <span class="viz-stack-seg viz-sev-{{ item.key }}" style="width: {{ item.pct }}%" title="{{ item.label }}: {{ item.count }}"></span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="viz-legend">
+          {% for item in visualizations.severity %}
+            {% if item.count %}
+            <span title="{{ item.label }}: {{ item.count }}"><i class="viz-dot viz-sev-{{ item.key }}"></i>{{ item.label }} {{ item.count }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="viz-empty">No alerts to chart</div>
+        {% endif %}
+      </article>
+
+      <article class="viz-panel">
+        <div class="viz-head">
+          <span>Alert trend</span>
+          <strong>{{ range_display }}</strong>
+        </div>
+        <div class="viz-bars" aria-label="Alert trend by date">
+          {% for point in visualizations.trend %}
+          <div class="viz-bar-col" title="{{ point.label }}: {{ point.count }}">
+            <span class="viz-bar-track"><span class="viz-bar" style="height: {{ point.height }}%"></span></span>
+            <small>{{ point.label }}</small>
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+
+      <article class="viz-panel">
+        <div class="viz-head">
+          <span>Top methods</span>
+          <strong>{{ visualizations.methods | length }}</strong>
+        </div>
+        {% for item in visualizations.methods %}
+        <div class="viz-rank-row" title="{{ item.label }}: {{ item.count }}">
+          <div><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
+          <b><i style="width: {{ item.pct }}%"></i></b>
+        </div>
+        {% else %}
+        <div class="viz-empty">No methods in view</div>
+        {% endfor %}
+      </article>
+
+      <article class="viz-panel">
+        <div class="viz-head">
+          <span>Top companies</span>
+          <strong>{{ visualizations.companies | length }}</strong>
+        </div>
+        {% for item in visualizations.companies %}
+        <div class="viz-rank-row" title="{{ item.label }}: {{ item.count }}">
+          <div><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
+          <b><i style="width: {{ item.pct }}%"></i></b>
+        </div>
+        {% else %}
+        <div class="viz-empty">No companies in view</div>
+        {% endfor %}
+      </article>
+    </div>
+  </div>
+</section>
+
 <div class="db-grid">
 
   <div class="db-panel">
@@ -183,7 +261,7 @@
         </thead>
         <tbody>
           {% for a in recent_alerts %}
-          <tr>
+          <tr class="alert-row alert-row-{{ (a.severity or 'unknown') | lower }}">
             <td class="al-date" title="{{ a.received_display }}"><a href="/alerts/{{ a.id }}">{{ a.received_display }}</a></td>
             <td class="al-host" title="{{ a.client_display or '' }}">{{ a.client_display or "—" }}</td>
             <td class="al-host" title="{{ a.user_display or '' }}">{{ a.user_display or "—" }}</td>
@@ -264,7 +342,7 @@
     <div class="severity-node">
       <span>2</span>
       <strong>Subsequent event increases</strong>
-      <small>Repeated hits on the same host raise the score each time. Spread across endpoints, multiple days, faster velocity, and host alert volume can add more weight.</small>
+      <small>Repeated hits on the same host raise the score each time. A repeat threshold reached across multiple days within a week forces Critical, while spread, velocity, and host volume can add more weight.</small>
     </div>
     <div class="severity-arrow">=</div>
     <div class="severity-node severity-node-score">
@@ -282,7 +360,7 @@
     <div><span>High</span><strong>{{ config.severity_high_threshold }}+</strong></div>
     <div><span>Medium</span><strong>{{ config.severity_medium_threshold }}+</strong></div>
   </div>
-  <p class="severity-note">ESET threat keywords set the base score by default, preserving the original severity model. Recurrence, spread, persistence, velocity, host volume, and containment outcome then adjust severity. Unresolved or failed remediation forces Critical severity and is eligible for Teams escalation, then Teams messages are capped per client during the configured cooldown.</p>
+  <p class="severity-note">ESET threat keywords set the base score by default, preserving the original severity model. Recurrence, spread, persistence, velocity, host volume, and containment outcome then adjust severity. Unresolved remediation and same-host repeats that cross the threshold on multiple days within a week force Critical severity and are eligible for Teams escalation, then Teams messages are capped per client during the configured cooldown.</p>
   <a class="severity-config-link" href="/settings#severity-assessment">Tune scoring parameters in Configure</a>
 </div>
 

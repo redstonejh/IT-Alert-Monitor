@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-{% set severity = alert.severity_display or "Unknown" %}
+{% set severity = alert.derived_severity_display or "Unknown" %}
+{% set acronis_status = alert.acronis_status_display or alert.severity_display or "Unknown" %}
 {% set machine = alert.device or "Unknown machine" %}
 {% set title = alert.reason or alert.alert_type or "Acronis alert detail" %}
 
@@ -16,7 +17,19 @@
 <section class="alert-summary-band">
   <article>
     <span>Severity</span>
-    <strong><span class="sev-tag sev-{{ alert.severity_class }}">{{ severity }}</span></strong>
+    <strong>
+      <button
+        class="sev-tag sev-tag-button sev-{{ alert.derived_severity_class }}"
+        type="button"
+        data-score="{{ alert.triage_score }}"
+        data-severity="{{ severity }}"
+        data-reasons='{{ alert.triage_score_reasons | tojson }}'
+      >{{ severity }}</button>
+    </strong>
+  </article>
+  <article>
+    <span>Push review</span>
+    <strong><span class="sev-tag sev-{{ alert.triage_class }}">{{ alert.triage_label }}</span></strong>
   </article>
   <article>
     <span>Company</span>
@@ -43,10 +56,11 @@
     <dl class="detail-list detail-list-featured">
       <dt>Date</dt><dd>{{ alert.date_display or "Not found" }}</dd>
       <dt>Company</dt><dd>{{ alert.company_display or "Not found" }}</dd>
-      <dt>Machine</dt><dd>{{ alert.device or "Not found" }}</dd>
+      <dt>Machine</dt><dd>{{ alert.machine_display or alert.device or "Not found" }}</dd>
       <dt>Backup</dt><dd>{{ alert.backup_failed_display }}</dd>
-      <dt>Reason</dt><dd>{{ alert.reason or "Not found" }}</dd>
-      <dt>Status</dt><dd>{{ severity }}</dd>
+      <dt>Reason</dt><dd>{{ alert.reason_display or alert.reason or "Not found" }}</dd>
+      <dt>Severity</dt><dd>{{ severity }}</dd>
+      <dt>Acronis status</dt><dd>{{ acronis_status }}</dd>
       <dt>Subject</dt><dd>{{ alert.subject or "Not found" }}</dd>
     </dl>
   </article>
@@ -54,12 +68,15 @@
   <article class="alert-panel escalation-panel">
     <div class="alert-panel-head">
       <div>
-        <span class="section-kicker">Escalation</span>
-        <h2>Not escalated</h2>
+        <span class="section-kicker">Triage preview</span>
+        <h2>{{ alert.triage_label }}</h2>
       </div>
     </div>
     <dl class="detail-list">
-      <dt>Status</dt><dd>Acronis escalation handling is not enabled yet.</dd>
+      <dt>Status</dt><dd>{% if alert.triage_would_push %}Eligible for Teams escalation with 24-hour company/machine dedupe.{% else %}Dashboard review only unless severity reaches Critical.{% endif %}</dd>
+      <dt>Score</dt><dd>{{ alert.triage_score }}</dd>
+      <dt>Category</dt><dd>{{ alert.triage_category_label }}</dd>
+      <dt>Why</dt><dd>{{ alert.triage_summary }}</dd>
       <dt>Received</dt><dd>{{ alert.received_display or alert.received_time }}</dd>
       <dt>Sender</dt><dd>{{ alert.sender or "Not found" }}</dd>
     </dl>
@@ -90,4 +107,14 @@
     <dt>Created</dt><dd>{{ alert.created_at or "Not found" }}</dd>
   </dl>
 </section>
+
+<dialog class="score-dialog" id="score-dialog">
+  <div class="score-dialog-head">
+    <span>Severity details</span>
+    <button type="button" class="score-dialog-close" aria-label="Close score details">x</button>
+  </div>
+  <strong id="score-dialog-title">Severity</strong>
+  <div class="score-dialog-score"><span>Score</span><b id="score-dialog-score">0</b></div>
+  <ul id="score-dialog-reasons"></ul>
+</dialog>
 {% endblock %}

@@ -135,7 +135,7 @@ def get_acronis_alert(alert_id: int) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
-def save_acronis_alert(alert: ParsedAcronisAlert) -> None:
+def save_acronis_alert(alert: ParsedAcronisAlert) -> int:
     data = alert.as_dict()
     columns = ", ".join(data.keys())
     placeholders = ", ".join(["?"] * len(data))
@@ -152,6 +152,105 @@ def save_acronis_alert(alert: ParsedAcronisAlert) -> None:
             """,
             tuple(data.values()),
         )
+        row = conn.execute(
+            "SELECT id FROM acronis_alerts WHERE message_id = ?",
+            (alert.message_id,),
+        ).fetchone()
+    return int(row["id"]) if row else 0
+
+
+def acronis_escalation_recent(fingerprint: str, cooldown_hours: int = 24) -> bool:
+    window_start = (
+        datetime.now(timezone.utc) - timedelta(hours=cooldown_hours)
+    ).isoformat()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT last_alerted_at FROM acronis_escalations WHERE fingerprint = ?",
+            (fingerprint,),
+        ).fetchone()
+    if row is None:
+        return False
+    last_alerted = row["last_alerted_at"]
+    if not last_alerted:
+        return False
+    return datetime.fromisoformat(last_alerted) > datetime.fromisoformat(window_start)
+
+
+def record_acronis_escalation(
+    acronis_alert_id: int,
+    fingerprint: str,
+    reason: str,
+    status: str,
+    payload: str,
+    error: str = "",
+    count: int = 1,
+    severity_rank: int = 4,
+) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO acronis_escalations(
+                acronis_alert_id, fingerprint, reason, status, payload, error,
+                last_count, last_severity_rank, last_alerted_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(fingerprint) DO UPDATE SET
+                acronis_alert_id = excluded.acronis_alert_id,
+                reason = excluded.reason,
+                status = excluded.status,
+                payload = excluded.payload,
+                error = excluded.error,
+                last_count = excluded.last_count,
+                last_severity_rank = excluded.last_severity_rank,
+                last_alerted_at = excluded.last_alerted_at
+            """,
+            (
+                acronis_alert_id,
+                fingerprint,
+                reason,
+                status,
+                payload,
+                error,
+                count,
+                severity_rank,
+                now,
+            ),
+        )
+
+
+def list_current_acronis_escalation_cases(
+    limit: int = 25,
+    start: str = "",
+    end: str = "",
+) -> list[dict[str, Any]]:
+    conds: list[str] = []
+    params: list[Any] = []
+    if start:
+        conds.append("acronis_alerts.received_time >= ?")
+        params.append(f"{start}T00:00:00" if len(start) == 10 else start)
+    if end:
+        conds.append("acronis_alerts.received_time <= ?")
+        params.append(f"{end}T23:59:59" if len(end) == 10 else end)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+    params.append(limit)
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT acronis_escalations.*, acronis_alerts.received_time,
+                   acronis_alerts.alert_date, acronis_alerts.severity,
+                   acronis_alerts.alert_type, acronis_alerts.device,
+                   acronis_alerts.alert_group, acronis_alerts.account,
+                   acronis_alerts.backup_failed, acronis_alerts.reason
+            FROM acronis_escalations
+            LEFT JOIN acronis_alerts ON acronis_alerts.id = acronis_escalations.acronis_alert_id
+            {where}
+            ORDER BY acronis_escalations.last_alerted_at DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def list_acronis_alerts(

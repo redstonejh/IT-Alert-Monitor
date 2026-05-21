@@ -12,6 +12,9 @@ from datetime import datetime, timedelta, timezone
 from app.database import get_connection
 from app.models import AppConfig, DEFAULT_TAXONOMY_SCORES
 
+PERSISTENT_REPEAT_OVERRIDE_PREFIX = "persistent repeat override"
+PERSISTENT_REPEAT_OVERRIDE_WINDOW_DAYS = 7
+
 
 def _config(config: AppConfig | None) -> AppConfig:
     if config is not None:
@@ -141,6 +144,11 @@ def contextual_adjustments(
     velocity_window = (now - timedelta(hours=cfg.velocity_window_hours)).isoformat()
     baseline_window = (now - timedelta(days=cfg.velocity_baseline_days)).isoformat()
     host_window = (now - timedelta(hours=cfg.host_alert_window_hours)).isoformat()
+    history_window = (now - timedelta(days=max(1, cfg.lookback_days or 60))).isoformat()
+    persistent_repeat_window = (
+        now - timedelta(days=PERSISTENT_REPEAT_OVERRIDE_WINDOW_DAYS)
+    ).isoformat()
+    current_day = now.date().isoformat()
 
     with get_connection() as conn:
         same_recent = 0
@@ -160,6 +168,47 @@ def contextual_adjustments(
             adjustment += cfg.repeated_same_host_1_adjustment
             reasons.append(f"same threat hit this host {same_recent + 1} times")
 
+        same_history_count = 0
+        history_days: set[str] = set()
+        persistent_repeat_count = 0
+        persistent_repeat_days: set[str] = set()
+        if threat_name and hostname:
+            same_history = conn.execute(
+                "SELECT substr(received_time, 1, 10) AS alert_day FROM alerts "
+                "WHERE threat_name = ? AND hostname = ? AND received_time >= ? AND received_time < ?",
+                (threat_name, hostname, history_window, now_iso),
+            ).fetchall()
+            same_history_count = len(same_history)
+            history_days = {
+                row["alert_day"]
+                for row in same_history
+                if row["alert_day"]
+            }
+            history_days.add(current_day)
+            persistent_repeat_history = conn.execute(
+                "SELECT substr(received_time, 1, 10) AS alert_day FROM alerts "
+                "WHERE threat_name = ? AND hostname = ? AND received_time >= ? AND received_time < ?",
+                (threat_name, hostname, persistent_repeat_window, now_iso),
+            ).fetchall()
+            persistent_repeat_count = len(persistent_repeat_history)
+            persistent_repeat_days = {
+                row["alert_day"]
+                for row in persistent_repeat_history
+                if row["alert_day"]
+            }
+            persistent_repeat_days.add(current_day)
+
+        total_persistent_repeat = persistent_repeat_count + 1 if threat_name and hostname else 0
+        distinct_days = len(history_days)
+        distinct_persistent_repeat_days = len(persistent_repeat_days)
+        persistent_repeat_threshold = max(3, cfg.repeat_threshold or 3)
+        if total_persistent_repeat >= persistent_repeat_threshold and distinct_persistent_repeat_days >= 2:
+            reasons.append(
+                f"{PERSISTENT_REPEAT_OVERRIDE_PREFIX}: same threat hit this host "
+                f"{total_persistent_repeat} times across {distinct_persistent_repeat_days} days "
+                f"within {PERSISTENT_REPEAT_OVERRIDE_WINDOW_DAYS} days"
+            )
+
         hosts_in_window = 0
         if threat_name:
             hosts_in_window = conn.execute(
@@ -176,13 +225,6 @@ def contextual_adjustments(
         elif hosts_in_window >= 2:
             adjustment += cfg.campaign_endpoint_2_adjustment
 
-        distinct_days = 0
-        if threat_name and hostname:
-            distinct_days = conn.execute(
-                "SELECT COUNT(DISTINCT substr(received_time, 1, 10)) AS c FROM alerts "
-                "WHERE threat_name = ? AND hostname = ? AND received_time <= ?",
-                (threat_name, hostname, now_iso),
-            ).fetchone()["c"]
         if distinct_days >= 4:
             adjustment += cfg.persistence_4_day_adjustment
             reasons.append(f"persisting {distinct_days} days")
@@ -234,6 +276,10 @@ def contextual_adjustments(
     return adjustment, reasons
 
 
+def has_persistent_repeat_override(reasons: list[str]) -> bool:
+    return any(reason.startswith(PERSISTENT_REPEAT_OVERRIDE_PREFIX) for reason in reasons)
+
+
 def score_alert(
     threat_name: str,
     hostname: str,
@@ -259,6 +305,10 @@ def score_alert(
         total = 100
         if "unresolved override forced Critical severity" not in reasons:
             reasons.append("unresolved override forced Critical severity")
+    elif has_persistent_repeat_override(reasons):
+        total = 100
+        if "persistent repeat override forced Critical severity" not in reasons:
+            reasons.append("persistent repeat override forced Critical severity")
     else:
         total = max(0, min(100, base + ctx))
     return total, severity_label(total, cfg), reasons
@@ -284,17 +334,22 @@ def scoring_breakdown(
         resolved_status,
         cfg,
     )
-    override = is_unresolved_or_failed(action_taken, containment_status, resolved_status)
+    unresolved_override = is_unresolved_or_failed(action_taken, containment_status, resolved_status)
+    persistent_repeat_override = has_persistent_repeat_override(reasons)
+    override = unresolved_override or persistent_repeat_override
     score = 100 if override else max(0, min(100, base + ctx))
     label = severity_label(score, cfg)
-    if override and "unresolved override forced Critical severity" not in reasons:
+    if unresolved_override and "unresolved override forced Critical severity" not in reasons:
         reasons.append("unresolved override forced Critical severity")
+    if persistent_repeat_override and "persistent repeat override forced Critical severity" not in reasons:
+        reasons.append("persistent repeat override forced Critical severity")
     return {
         "base_score": base,
         "context_adjustment": ctx,
         "score": score,
         "severity": label,
         "reasons": reasons,
-        "unresolved_override": override,
+        "unresolved_override": unresolved_override,
+        "persistent_repeat_override": persistent_repeat_override,
         "taxonomy_weighting": cfg.use_taxonomy_weighting,
     }

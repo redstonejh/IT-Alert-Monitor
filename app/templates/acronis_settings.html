@@ -125,15 +125,145 @@
     </div>
   </section>
 
-  <section class="form-section severity-section">
+  <section class="form-section severity-section" id="acronis-severity-assessment">
     <div class="section-heading">
-      <h2>Acronis alert taxonomy</h2>
-      <p>Map Acronis alert types to base scores. One entry per line: <code>Alert Type = score</code>. Independent from ESET taxonomy.</p>
+      <h2>Acronis severity assessment</h2>
+      <p>Derived severity uses Acronis status, root-cause category, backup outcome, asset context, freshness, spread, and stale-noise penalties. Critical Acronis cases can post to Teams with one message per company/machine per 24 hours.</p>
     </div>
+
+    <div class="logic-card">
+      <strong>Current logic</strong>
+      <span>Critical requires score >= {{ config.acronis_triage_critical_threshold }} and the push gate. High if score >= {{ config.acronis_triage_high_threshold }} and actionable. Medium if score >= {{ config.acronis_triage_medium_threshold }}. Otherwise Low.</span>
+      <span>Storage, repository, capacity, auth/license, and agent/service evidence are high confidence. OS restarts, closed backup windows, stale offline endpoints, and repeated unchanged patterns are pushed down.</span>
+    </div>
+
     <div class="form-grid scoring-grid">
-      <label class="full-span">
-        <span class="lbl-fixed">Acronis taxonomy scores</span>
-        <textarea name="acronis_taxonomy_scores" rows="11" spellcheck="false">{{ config.acronis_taxonomy_scores }}</textarea>
+      <input type="hidden" name="acronis_taxonomy_scores" value="{{ config.acronis_taxonomy_scores }}">
+
+      <div class="score-group-title full-span">Severity thresholds</div>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_critical_threshold" value="{{ config.acronis_triage_critical_threshold }}" placeholder=" ">
+        <span class="fl-lbl">Critical threshold</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_high_threshold" value="{{ config.acronis_triage_high_threshold }}" placeholder=" ">
+        <span class="fl-lbl">High threshold</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_medium_threshold" value="{{ config.acronis_triage_medium_threshold }}" placeholder=" ">
+        <span class="fl-lbl">Medium threshold</span>
+      </label>
+
+      <div class="score-group-title full-span">Acronis source status</div>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_status_critical" value="{{ config.acronis_triage_status_critical }}" placeholder=" ">
+        <span class="fl-lbl">Critical status weight</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_status_error" value="{{ config.acronis_triage_status_error }}" placeholder=" ">
+        <span class="fl-lbl">Error status weight</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_status_warning" value="{{ config.acronis_triage_status_warning }}" placeholder=" ">
+        <span class="fl-lbl">Warning status weight</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_status_information" value="{{ config.acronis_triage_status_information }}" placeholder=" ">
+        <span class="fl-lbl">Information status weight</span>
+      </label>
+
+      <div class="score-group-title full-span">Root-cause category weights</div>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_storage_failure" value="{{ config.acronis_triage_storage_failure }}" placeholder=" ">
+        <span class="fl-lbl">Storage failure</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_repository_failure" value="{{ config.acronis_triage_repository_failure }}" placeholder=" ">
+        <span class="fl-lbl">Repository issue</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_capacity_full" value="{{ config.acronis_triage_capacity_full }}" placeholder=" ">
+        <span class="fl-lbl">Capacity full</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_auth_or_license" value="{{ config.acronis_triage_auth_or_license }}" placeholder=" ">
+        <span class="fl-lbl">Auth/license issue</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_agent_or_service_down" value="{{ config.acronis_triage_agent_or_service_down }}" placeholder=" ">
+        <span class="fl-lbl">Agent/service down</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_transient_maintenance" value="{{ config.acronis_triage_transient_maintenance }}" placeholder=" ">
+        <span class="fl-lbl">Transient maintenance</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_backup_failed_generic" value="{{ config.acronis_triage_backup_failed_generic }}" placeholder=" ">
+        <span class="fl-lbl">Generic backup failure</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_connectivity" value="{{ config.acronis_triage_connectivity }}" placeholder=" ">
+        <span class="fl-lbl">Connectivity</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_stale_offline" value="{{ config.acronis_triage_stale_offline }}" placeholder=" ">
+        <span class="fl-lbl">Stale offline</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_success_or_info" value="{{ config.acronis_triage_success_or_info }}" placeholder=" ">
+        <span class="fl-lbl">Success/info</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_unknown" value="{{ config.acronis_triage_unknown }}" placeholder=" ">
+        <span class="fl-lbl">Unknown category</span>
+      </label>
+
+      <div class="score-group-title full-span">Context adjustments</div>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_backup_failed_adjustment" value="{{ config.acronis_triage_backup_failed_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Backup failed</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_backup_not_failed_adjustment" value="{{ config.acronis_triage_backup_not_failed_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Backup not failed</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_server_adjustment" value="{{ config.acronis_triage_server_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Server-like machine</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_endpoint_connectivity_adjustment" value="{{ config.acronis_triage_endpoint_connectivity_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Endpoint connectivity noise</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_maintenance_adjustment" value="{{ config.acronis_triage_maintenance_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Maintenance interruption</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_new_pattern_adjustment" value="{{ config.acronis_triage_new_pattern_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">New pattern</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_repeat_pattern_adjustment" value="{{ config.acronis_triage_repeat_pattern_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Repeat pattern</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_spread_adjustment" value="{{ config.acronis_triage_spread_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">Multi-machine spread</span>
+      </label>
+
+      <div class="score-group-title full-span">Offline age penalties</div>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_offline_7_day_adjustment" value="{{ config.acronis_triage_offline_7_day_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">7+ days offline</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_offline_14_day_adjustment" value="{{ config.acronis_triage_offline_14_day_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">14+ days offline</span>
+      </label>
+      <label class="fl-wrap">
+        <input type="number" name="acronis_triage_offline_30_day_adjustment" value="{{ config.acronis_triage_offline_30_day_adjustment }}" placeholder=" ">
+        <span class="fl-lbl">30+ days offline</span>
       </label>
     </div>
   </section>

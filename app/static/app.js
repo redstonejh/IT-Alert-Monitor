@@ -70,6 +70,37 @@ document.querySelectorAll(".range-custom").forEach((form) => {
 
 document.addEventListener("DOMContentLoaded", () => {
   const showToast = showGlobalToast;
+  const applyTheme = (theme) => {
+    const dark = theme === "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "";
+    if (!dark) delete document.documentElement.dataset.theme;
+    document.querySelectorAll(".theme-toggle").forEach((button) => {
+      button.classList.toggle("is-dark", dark);
+      button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+      button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+      button.setAttribute("aria-pressed", dark.toString());
+    });
+  };
+  let savedTheme = "";
+  try {
+    savedTheme = localStorage.getItem("dashboard-theme") || "";
+  } catch {
+    savedTheme = "";
+  }
+  applyTheme(savedTheme);
+  document.querySelectorAll(".theme-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      try {
+        if (nextTheme === "dark") {
+          localStorage.setItem("dashboard-theme", "dark");
+        } else {
+          localStorage.removeItem("dashboard-theme");
+        }
+      } catch {}
+      applyTheme(nextTheme);
+    });
+  });
 
   const refreshOverflowTitles = () => {
     const skipTags = new Set(["SCRIPT", "STYLE", "SVG", "PATH", "INPUT", "TEXTAREA", "SELECT", "OPTION"]);
@@ -111,18 +142,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const switcherToggle = document.getElementById("dash-switcher-toggle");
   const switcherMenu = document.getElementById("dash-switch-menu");
   if (switcherToggle && switcherMenu) {
+    const switcher = switcherToggle.closest(".dash-switcher");
+    let switcherCloseTimer;
+    const openSwitcher = () => {
+      window.clearTimeout(switcherCloseTimer);
+      switcherMenu.classList.add("open");
+      switcherToggle.setAttribute("aria-expanded", "true");
+    };
+    const closeSwitcher = () => {
+      switcherMenu.classList.remove("open");
+      switcherToggle.setAttribute("aria-expanded", "false");
+    };
+    const scheduleCloseSwitcher = () => {
+      window.clearTimeout(switcherCloseTimer);
+      switcherCloseTimer = window.setTimeout(closeSwitcher, 140);
+    };
+    switcher?.addEventListener("mouseenter", openSwitcher);
+    switcher?.addEventListener("mouseleave", scheduleCloseSwitcher);
+    switcherToggle.addEventListener("focus", openSwitcher);
     switcherToggle.addEventListener("click", (e) => {
       e.stopPropagation();
       const open = switcherMenu.classList.toggle("open");
       switcherToggle.setAttribute("aria-expanded", open.toString());
     });
-    switcherMenu.addEventListener("mouseleave", () => {
-      switcherMenu.classList.remove("open");
-      switcherToggle.setAttribute("aria-expanded", "false");
-    });
+    switcherMenu.addEventListener("mouseenter", openSwitcher);
+    switcherMenu.addEventListener("mouseleave", scheduleCloseSwitcher);
     document.addEventListener("click", () => {
-      switcherMenu.classList.remove("open");
-      switcherToggle.setAttribute("aria-expanded", "false");
+      closeSwitcher();
     });
     switcherMenu.addEventListener("click", (e) => e.stopPropagation());
   }
@@ -137,6 +183,25 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Configuration saved and historical alerts rescored.");
     }
   }
+
+  document.querySelectorAll(".db-panel").forEach((panel) => {
+    const header = panel.querySelector(".db-panel-hd");
+    const body = panel.querySelector(".db-panel-body");
+    if (!header || !body) return;
+    header.setAttribute("role", "button");
+    header.setAttribute("tabindex", "0");
+    header.setAttribute("aria-expanded", (!panel.classList.contains("db-panel-collapsed")).toString());
+    const togglePanel = () => {
+      const collapsed = panel.classList.toggle("db-panel-collapsed");
+      header.setAttribute("aria-expanded", (!collapsed).toString());
+    };
+    header.addEventListener("click", togglePanel);
+    header.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      togglePanel();
+    });
+  });
 
   const scoreDialog = document.getElementById("score-dialog");
   if (scoreDialog) {

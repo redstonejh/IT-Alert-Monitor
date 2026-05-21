@@ -7,7 +7,7 @@
 <header class="app-nav">
   <div class="app-nav-brand-group">
     <div class="dash-switcher">
-      <button class="dash-switch-btn" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
+      <button class="dash-switch-btn dash-switch-hero dash-switch-hero-acronis" type="button" id="dash-switcher-toggle" aria-haspopup="true" aria-expanded="false">
         Acronis <span class="dash-switch-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dash-switch-menu" id="dash-switch-menu">
@@ -22,12 +22,6 @@
         </a>
       </div>
     </div>
-    <a class="app-nav-brand" href="/acronis" aria-label="Acronis Monitor dashboard">
-      <span>
-        <strong>Acronis Monitor</strong>
-        <small>Backup operations dashboard</small>
-      </span>
-    </a>
   </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
     <div class="nav-status-item">
@@ -53,6 +47,10 @@
     {% elif request.query_params.get("scanned") and request.query_params.get("scanned") != "0" %}
       <span class="cmd-badge">{{ request.query_params.get("scanned") }} new</span>
     {% endif %}
+    <button class="theme-toggle" type="button" aria-label="Switch dashboard theme" title="Toggle dark mode">
+      <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
+      <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
+    </button>
     <a class="cmd-btn" href="/acronis/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
     {% if acronis_config.mailbox_address %}
     <form method="post" action="/acronis/settings/disconnect">
@@ -143,19 +141,31 @@
             <th>Machine</th>
             <th>Backup</th>
             <th>Reason</th>
-            <th>Status</th>
+            <th>
+              <span class="severity-head">
+                Severity
+                <button class="severity-help-btn" type="button" popovertarget="acronis-severity-help-popover" aria-label="Show Acronis severity scoring logic">?</button>
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>
           {% for alert in acronis_alerts %}
-          <tr>
+          <tr class="alert-row alert-row-{{ alert.derived_severity_class }}">
             <td class="al-date" title="{{ alert.date_display or '' }}"><a href="/acronis/alerts/{{ alert.id }}">{{ alert.date_display or "—" }}</a></td>
             <td class="al-host" title="{{ alert.company_display or '' }}">{{ alert.company_display or "Unknown" }}</td>
             <td class="al-threat" title="{{ alert.machine_display or '' }}">{{ alert.machine_display or "Unknown" }}</td>
             <td class="al-status" title="{{ alert.backup_failed_display }}">{{ alert.backup_failed_display }}</td>
             <td class="al-status" title="{{ alert.reason_display or '' }}">{{ alert.reason_display or "—" }}</td>
             <td>
-              <span class="sev-tag sev-{{ alert.severity_class }}">{{ alert.severity_display }}</span>
+              <button
+                class="sev-tag sev-tag-button sev-{{ alert.derived_severity_class }}"
+                type="button"
+                data-score="{{ alert.triage_score }}"
+                data-severity="{{ alert.derived_severity_display }}"
+                data-reasons='{{ alert.triage_score_reasons | tojson }}'
+                title="Acronis status: {{ alert.acronis_status_display }} · {{ alert.triage_label }} · Score {{ alert.triage_score }} · {{ alert.triage_summary }}"
+              >{{ alert.derived_severity_display }}</button>
             </td>
           </tr>
           {% else %}
@@ -177,16 +187,74 @@
   <div class="db-panel">
     <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
-      <span class="db-panel-count">0</span>
+      <span class="db-panel-count">{{ acronis_escalations | length }}</span>
     </div>
-    <div class="db-panel-body esc-feed esc-timeline-empty">
+    <div class="db-panel-body esc-feed {% if acronis_escalations %}esc-timeline{% else %}esc-timeline-empty{% endif %}">
+      {% for msg in acronis_escalations %}
+      <a class="esc-card acr-triage-card" href="/acronis/alerts/{{ msg.acronis_alert_id }}">
+        <span class="timeline-dot" aria-hidden="true"></span>
+        <div class="esc-hd">
+          <span class="esc-reason">{{ msg.reason_label }}</span>
+          <span class="esc-time">{{ msg.created_display }}</span>
+        </div>
+        <div class="esc-fields">
+          <div class="esc-row"><span>Company</span><strong>{{ msg.company_display }}</strong></div>
+          <div class="esc-row"><span>Machine</span><strong>{{ msg.machine_display }}</strong></div>
+          <div class="esc-row"><span>Backup</span><strong>{{ msg.backup_failed_display }}</strong></div>
+          <div class="esc-row"><span>Why</span><strong>{{ msg.reason_display }}</strong></div>
+        </div>
+      </a>
+      {% else %}
       <div class="empty-state esc-empty">
         <span class="empty-illustration empty-illustration-shield" aria-hidden="true"></span>
         <strong>No escalations in this range</strong>
-        <small>Acronis escalations will appear here once escalation handling is enabled.</small>
+        <small>Critical Acronis cases will appear here after they are pushed or logged for Teams.</small>
       </div>
+      {% endfor %}
     </div>
   </div>
 </div>
+
+<div class="severity-popover" id="acronis-severity-help-popover" popover>
+  <div class="severity-popover-head">
+    <span>Acronis severity model</span>
+    <strong>How derived severity is weighed</strong>
+  </div>
+  <div class="severity-flow" aria-label="Acronis severity scoring flow">
+    <div class="severity-node">
+      <span>1</span>
+      <strong>Acronis status</strong>
+      <small>Critical, Error, Warning, and Information contribute a small starting value. The vendor label is evidence, not the final severity.</small>
+    </div>
+    <div class="severity-arrow">+</div>
+    <div class="severity-node">
+      <span>2</span>
+      <strong>Cause and asset context</strong>
+      <small>Storage, repository, capacity, auth, agent/service, connectivity, transient maintenance, stale offline, server-like machine, spread, and repeated patterns adjust the score.</small>
+    </div>
+    <div class="severity-arrow">=</div>
+    <div class="severity-node severity-node-score">
+      <span>3</span>
+      <strong>Push gate</strong>
+      <small>Critical is reserved for actionable, high-confidence cases. Teams messages are capped to one per company/machine in 24 hours.</small>
+    </div>
+  </div>
+  <div class="severity-equation">
+    <span>Current thresholds</span>
+    <strong>Critical {{ triage_config.acronis_triage_critical_threshold }}+ with push gate; High {{ triage_config.acronis_triage_high_threshold }}+; Medium {{ triage_config.acronis_triage_medium_threshold }}+</strong>
+  </div>
+  <p class="severity-note">Transient operating system restarts, closed backup windows, stale workstation offline alerts, and repeated unchanged noise are intentionally pushed down. Storage, disk, repository, capacity, auth/license, agent/service, and multi-machine patterns are weighted higher.</p>
+  <a class="severity-config-link" href="/acronis/settings#acronis-severity-assessment">Tune Acronis scoring in Configure</a>
+</div>
+
+<dialog class="score-dialog" id="score-dialog">
+  <div class="score-dialog-head">
+    <span>Severity details</span>
+    <button type="button" class="score-dialog-close" aria-label="Close score details">x</button>
+  </div>
+  <strong id="score-dialog-title">Severity</strong>
+  <div class="score-dialog-score"><span>Score</span><b id="score-dialog-score">0</b></div>
+  <ul id="score-dialog-reasons"></ul>
+</dialog>
 
 {% endblock %}

@@ -137,13 +137,13 @@
   <section class="form-section severity-section" id="severity-assessment">
     <div class="section-heading">
       <h2>Severity assessment</h2>
-      <p>Final score = taxonomy base score + context adjustments. Failed or unresolved remediation forces Critical. Existing alerts are rescored when you save.</p>
+      <p>Final score = taxonomy base score + context adjustments. Failed or unresolved remediation, and persistent same-host repeats clustered across multiple days within a week, force Critical. Existing alerts are rescored when you save.</p>
     </div>
 
     <div class="logic-card">
       <strong>Current logic</strong>
       <span>Critical if score >= {{ config.severity_critical_threshold }}. High if >= {{ config.severity_high_threshold }}. Medium if >= {{ config.severity_medium_threshold }}. Otherwise Low.</span>
-      <span>Unresolved or failed remediation overrides scoring to Critical. Teams posting is capped per client by the configured cooldown.</span>
+      <span>Unresolved or failed remediation overrides scoring to Critical. Same-host repeats that cross the repeat threshold on multiple days within a week also force Critical. Teams posting is capped per client by the configured cooldown.</span>
     </div>
 
     <div class="form-grid scoring-grid">

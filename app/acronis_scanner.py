@@ -5,7 +5,18 @@ from datetime import datetime, timedelta, timezone
 from app.acronis_parser import is_acronis_message, parse_acronis_messages
 from app.database import init_db
 from app.graph_client import GraphClient
-from app.storage import acronis_alert_exists, get_acronis_config, save_acronis_alert, update_state
+from app.storage import (
+    acronis_alert_exists,
+    acronis_escalation_recent,
+    add_teams_message,
+    get_acronis_config,
+    get_config,
+    list_acronis_alerts,
+    record_acronis_escalation,
+    save_acronis_alert,
+    update_state,
+)
+from app.teams_notifier import TeamsNotifier
 
 logger = logging.getLogger(__name__)
 DEFAULT_LOOKBACK_DAYS = 60
@@ -35,6 +46,75 @@ def _configured(config) -> bool:
     return bool(config.tenant_id and config.client_id and config.client_secret and config.mailbox_address)
 
 
+def _acronis_push_fingerprint(row: dict) -> str:
+    company = str(row.get("company_display") or row.get("alert_group") or row.get("account") or "unknown").strip().lower()
+    machine = str(row.get("machine_display") or row.get("device") or "unknown").strip().lower()
+    return f"acronis_critical_24h|{company}|{machine}"
+
+
+def _maybe_escalate_acronis_alert(alert_id: int) -> bool:
+    from app.routes.acronis import (
+        _acronis_triage_config,
+        _backup_failed_display,
+        _backup_failed_value,
+        _company_display,
+        _derived_severity_from_triage,
+        _machine_display,
+        _reason_display,
+        _status_display,
+        _triage_context,
+        _triage_decision,
+    )
+
+    shared_config = get_config()
+    rows = list_acronis_alerts(limit=500)
+    target: dict | None = None
+    for row in rows:
+        row["company_display"] = _company_display(row)
+        row["machine_display"] = _machine_display(row)
+        row["backup_failed_display"] = _backup_failed_display(_backup_failed_value(row))
+        row["reason_display"] = _reason_display(row)
+        row["severity_display"] = _status_display(row)
+        if int(row.get("id") or 0) == int(alert_id):
+            target = row
+    if not target:
+        return False
+
+    triage_config = _acronis_triage_config()
+    context = _triage_context(rows)
+    triage = _triage_decision(target, context, triage_config)
+    severity_display, _severity_class = _derived_severity_from_triage(triage, triage_config)
+    target["triage_score"] = triage["score"]
+    target["triage_category_label"] = triage["category_label"]
+    target["derived_severity_display"] = severity_display
+    if severity_display.lower() != "critical":
+        return False
+
+    fingerprint = _acronis_push_fingerprint(target)
+    if acronis_escalation_recent(fingerprint, cooldown_hours=24):
+        return False
+
+    notifier = TeamsNotifier(shared_config.teams_webhook_url)
+    payload = notifier.format_acronis_alert(target, "critical_severity", 1)
+    if shared_config.teams_dry_run or not shared_config.teams_webhook_url:
+        status = "preview"
+        add_teams_message(None, status, "acronis_critical_severity", payload)
+        record_acronis_escalation(alert_id, fingerprint, "critical_severity", status, payload)
+        return True
+
+    try:
+        notifier.send_text(payload)
+        add_teams_message(None, "sent", "acronis_critical_severity", payload)
+        record_acronis_escalation(alert_id, fingerprint, "critical_severity", "sent", payload)
+        update_state("last_acronis_teams_alert_time", datetime.now(timezone.utc).isoformat())
+        return True
+    except Exception as exc:
+        add_teams_message(None, "failed", "acronis_critical_severity", payload, str(exc))
+        record_acronis_escalation(alert_id, fingerprint, "critical_severity", "failed", payload, str(exc))
+        logger.exception("Acronis Teams send failed")
+        return False
+
+
 def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
     processed = skipped = parse_failed = 0
     if not PARSING_ENABLED:
@@ -62,9 +142,10 @@ def _process_messages(messages: list[dict], source: str) -> dict[str, int]:
             continue
         for alert in alerts:
             was_new = not acronis_alert_exists(alert.message_id)
-            save_acronis_alert(alert)
+            alert_id = save_acronis_alert(alert)
             if was_new:
                 processed += 1
+                _maybe_escalate_acronis_alert(alert_id)
             else:
                 skipped += 1
 

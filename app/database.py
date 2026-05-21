@@ -123,6 +123,21 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_acronis_received_time
                 ON acronis_alerts(received_time);
 
+            CREATE TABLE IF NOT EXISTS acronis_escalations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                acronis_alert_id INTEGER,
+                fingerprint TEXT NOT NULL UNIQUE,
+                reason TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'preview',
+                payload TEXT NOT NULL DEFAULT '',
+                error TEXT NOT NULL DEFAULT '',
+                last_count INTEGER NOT NULL DEFAULT 0,
+                last_severity_rank INTEGER NOT NULL DEFAULT 0,
+                last_alerted_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(acronis_alert_id) REFERENCES acronis_alerts(id)
+            );
+
             CREATE TABLE IF NOT EXISTS xymon_alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message_id TEXT,

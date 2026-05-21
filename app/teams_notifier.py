@@ -41,9 +41,24 @@ class TeamsNotifier:
         self.send_text(text)
         return text
 
+    def format_acronis_alert(self, alert: dict, reason: str, count: int = 1) -> str:
+        title = f"Acronis escalation: {alert.get('derived_severity_display') or 'Critical'} - {alert.get('triage_category_label') or 'Backup alert'}"
+        lines = [
+            f"**{title}**",
+            f"Reason: {reason.replace('_', ' ').title()}",
+            f"Company: {abbreviate_company(alert.get('company_display') or alert.get('alert_group') or alert.get('account') or '') or 'Unknown'}",
+            f"Machine: {alert.get('machine_display') or alert.get('device') or 'Unknown'}",
+            f"Backup: {alert.get('backup_failed_display') or 'Unknown'}",
+            f"Issue: {alert.get('reason_display') or alert.get('reason') or 'Unknown'}",
+            f"Score: {alert.get('triage_score', 'Unknown')}",
+            f"Matching count: {count}",
+            f"Received: {alert.get('received_time') or 'Unknown'}",
+        ]
+        return "\n\n".join(lines)
+
     @staticmethod
     def _adaptive_card_payload(text: str) -> dict:
-        title = "ESET Alert Monitor"
+        title = "Alert Monitor"
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         if lines and lines[0].startswith("**") and lines[0].endswith("**"):
             title = lines.pop(0).strip("*")

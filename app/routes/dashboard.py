@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 import json
@@ -309,6 +310,124 @@ def _ensure_scan_coverage(days: int) -> tuple[bool, int]:
     return scanned, processed
 
 
+def _chart_percent(value: int, total: int) -> int:
+    if total <= 0 or value <= 0:
+        return 0
+    return max(1, min(100, round((value / total) * 100)))
+
+
+def _received_local_date(row: dict):
+    value = row.get("received_time")
+    if not value:
+        return None
+    try:
+        received = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if received.tzinfo is None:
+        received = received.replace(tzinfo=timezone.utc)
+    utc = received.astimezone(timezone.utc)
+    try:
+        return utc.astimezone(ZoneInfo("America/Los_Angeles")).date()
+    except ZoneInfoNotFoundError:
+        return _pacific_fallback(utc).date()
+
+
+def _top_visual_rows(counter: Counter, total: int, limit: int = 4) -> list[dict]:
+    max_count = max(counter.values(), default=0)
+    rows: list[dict] = []
+    for label, count in counter.most_common(limit):
+        rows.append(
+            {
+                "label": label,
+                "count": count,
+                "pct": _chart_percent(count, max_count),
+                "share": _chart_percent(count, total),
+            }
+        )
+    return rows
+
+
+def _trend_visual_rows(alerts: list[dict], start: str, end: str) -> list[dict]:
+    try:
+        start_date = datetime.strptime(start, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return []
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+    span_days = max(1, (end_date - start_date).days + 1)
+    bucket_count = min(12, span_days)
+    buckets: list[dict] = []
+    for idx in range(bucket_count):
+        bucket_start = start_date + timedelta(days=(idx * span_days) // bucket_count)
+        bucket_end = start_date + timedelta(days=(((idx + 1) * span_days) // bucket_count) - 1)
+        label = (
+            f"{bucket_start:%m/%d}"
+            if bucket_start == bucket_end
+            else f"{bucket_start:%m/%d}-{bucket_end:%m/%d}"
+        )
+        buckets.append({"label": label, "count": 0})
+    for row in alerts:
+        local_date = _received_local_date(row)
+        if local_date is None or local_date < start_date or local_date > end_date:
+            continue
+        offset = (local_date - start_date).days
+        bucket_index = min(bucket_count - 1, (offset * bucket_count) // span_days)
+        buckets[bucket_index]["count"] += 1
+    max_count = max((bucket["count"] for bucket in buckets), default=0)
+    for bucket in buckets:
+        count = int(bucket["count"])
+        bucket["height"] = 0 if count == 0 else max(8, _chart_percent(count, max_count))
+    return buckets
+
+
+def _dashboard_visuals(alerts: list[dict], start: str, end: str) -> dict:
+    total = len(alerts)
+    severity_counts: Counter = Counter()
+    method_counts: Counter = Counter()
+    company_counts: Counter = Counter()
+    severity_aliases = {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "moderate": "medium",
+        "low": "low",
+    }
+    for row in alerts:
+        severity_key = severity_aliases.get(str(row.get("severity") or "").strip().lower(), "unknown")
+        severity_counts[severity_key] += 1
+        method = str(row.get("method_display") or "Unknown").strip() or "Unknown"
+        company = str(row.get("client_display") or "Unknown").strip() or "Unknown"
+        method_counts[method] += 1
+        company_counts[company] += 1
+
+    severity_rows = []
+    for key, label in (
+        ("critical", "Critical"),
+        ("high", "High"),
+        ("medium", "Medium"),
+        ("low", "Low"),
+        ("unknown", "Unknown"),
+    ):
+        count = severity_counts.get(key, 0)
+        severity_rows.append(
+            {
+                "key": key,
+                "label": label,
+                "count": count,
+                "pct": _chart_percent(count, total),
+            }
+        )
+    return {
+        "total": total,
+        "severity": severity_rows,
+        "trend": _trend_visual_rows(alerts, start, end),
+        "methods": _top_visual_rows(method_counts, total),
+        "companies": _top_visual_rows(company_counts, total),
+    }
+
+
 @router.get("/")
 @router.get("/dashboard")
 def dashboard(request: Request):
@@ -384,6 +503,7 @@ def dashboard(request: Request):
             continue
         filtered_alerts.append(alert)
     recent_alerts = filtered_alerts
+    visualizations = _dashboard_visuals(recent_alerts, view_start, view_end)
     teams_messages = list_current_escalation_cases(50, start=view_start, end=view_end)
     for message in teams_messages:
         message["created_display"] = _format_datetime(message.get("created_at"))
@@ -399,6 +519,7 @@ def dashboard(request: Request):
             "stats": stats,
             "redirect_uri": local_redirect_uri(request),
             "recent_alerts": recent_alerts,
+            "visualizations": visualizations,
             "escalations": list_events("escalation", 15),
             "noise_events": list_events("noise", 15),
             "suppressed_events": list_events("suppressed", 15),
