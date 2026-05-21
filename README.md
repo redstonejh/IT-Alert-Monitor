@@ -8,11 +8,11 @@ The project is designed for teams that receive operational notifications by emai
 
 ## What It Does
 
-The monitor connects to Microsoft 365 mailboxes through Microsoft Graph, reads matching notification emails, stores historical events in SQLite, and evaluates ESET alerts against a configurable severity and escalation model.
+The monitor connects to Microsoft 365 mailboxes through Microsoft Graph, reads matching notification emails, stores historical events in SQLite, and evaluates ESET and Acronis alerts against configurable severity and escalation models.
 
 It focuses on reducing Teams noise. Alerts are recorded historically, but Teams escalation is intentionally gated so the channel receives only meaningful Critical events, capped to the first Critical alert per client in a rolling 24-hour window.
 
-Acronis and Xymon dashboards currently provide the same mailbox connection, range backfill, sync status, and blank Alerts/Escalations layout as ESET, but parsing/storage for those email bodies is intentionally disabled until real notification samples are available.
+Acronis parsing is enabled for daily status report and active-alert notification emails. Xymon still provides the shared mailbox connection, range backfill, sync status, and Alerts/Escalations layout, but Xymon parsing remains disabled until production notification samples are finalized.
 
 ---
 
@@ -28,10 +28,16 @@ Acronis and Xymon dashboards currently provide the same mailbox connection, rang
 - Configurable Acronis sender and subject filters (stored independently)
 - Configurable Xymon sender and subject filters (stored independently)
 - ESET alert body parsing for hostname, user, threat, severity, action, status, IP, OS, and raw email body
-- Acronis and Xymon mailbox sync shells with parsing disabled until sample emails are available
+- Acronis alert parsing for report date, company/group/account, machine/device, backup outcome, reason, and vendor status
+- Company abbreviation lookup from `app/company_abbreviations.csv`, shared by dashboards and Teams payloads
+- Xymon mailbox sync shell with parsing disabled until sample emails are available
 - Configurable severity scoring model with taxonomy base scores plus recurrence, spread, persistence, velocity, host volume, and remediation outcome
+- Acronis derived severity model that down-weights stale/offline noise and transient restarts while prioritizing storage, repository, capacity, auth/license, agent/service, and spread evidence
 - JSON API endpoints for dashboard, alert detail, settings, and scoring preview
 - Dashboard metric filters for total alerts, Critical clients, repeated threats, unresolved cases, and escalations
+- Global dashboard search across visible alert fields, date presets, and compact custom range control
+- Collapsible Analytics, Alerts, and Escalations panels with shared visual behavior
+- Dark mode with screenshot-stable rendering, explicit scrollbars, and higher contrast panel hierarchy
 - Alert detail pages with parsed fields, raw email body, escalation context, and historical matches
 - Teams webhook delivery with local preview mode
 - Encrypted local storage for sensitive settings
@@ -49,7 +55,7 @@ Microsoft 365 mailbox
 Microsoft Graph API
         |
         v
-  ESET parser       Acronis sync shell       Xymon sync shell
+  ESET parser       Acronis parser           Xymon sync shell
         |                  |                       |
         v                  v                       v
               SQLite history store
@@ -66,31 +72,33 @@ Main modules:
 - `app/main.py` — starts FastAPI, mounts routes and static assets, runs the polling loop
 - `app/graph_client.py` — authenticates with Microsoft Graph and reads mailbox messages
 - `app/parser.py` — extracts structured ESET fields from email bodies
-- `app/acronis_scanner.py` — scans the Acronis mailbox, tracks coverage, and currently skips parsing
+- `app/acronis_parser.py` — extracts Acronis alert rows from daily status and active-alert emails
+- `app/acronis_scanner.py` — scans the Acronis mailbox, stores parsed alerts, tracks coverage, and applies Acronis Teams gating
 - `app/xymon_scanner.py` — scans the Xymon mailbox, tracks coverage, and currently skips parsing
 - `app/xymon_parser.py` — parser scaffold for future Xymon notification samples
 - `app/scoring.py` — computes configurable 0–100 severity scores
 - `app/rules.py` — applies Teams escalation throttling
 - `app/storage.py` — stores configuration, alerts, events, and state in SQLite
+- `app/company_abbreviations.py` — resolves client/company display acronyms from CSV
 - `app/security.py` — encrypts stored secrets with a local Fernet key
 - `app/teams_notifier.py` — posts Teams webhook payloads
 - `app/scanner.py` — runs ESET mailbox scans from the web app or CLI
 
 ---
 
-## Severity Scoring — Full Algorithm
+## ESET Severity Scoring — Full Algorithm
 
-The scoring engine lives in `app/scoring.py`. Scores run from 0 to 100 and are bucketed into four severity labels. The algorithm has three distinct stages: base score, contextual adjustments, and the unresolved override.
+The scoring engine lives in `app/scoring.py`. Scores run from 0 to 100 and are bucketed into four severity labels. The algorithm has three distinct stages: base score, contextual adjustments, and hard overrides for unresolved or persistent repeat patterns.
 
 ### Stage 1 — Base Score
 
 Every alert starts from a base score derived from its threat name.
 
-**Mode A: Equal base score (default)**
+**Mode A: Equal base score**
 
 When taxonomy weighting is off, every threat starts from the same configurable base score (`unknown_base_score`, default `30`). Contextual signals — not the threat name — drive the final score. This is the recommended mode when you want recurrence and containment failure to dominate severity.
 
-**Mode B: Taxonomy weighting**
+**Mode B: Taxonomy weighting (default)**
 
 When taxonomy weighting is on, the engine compares the part of the threat name after the last `/` (case-insensitive) against a keyword table. Each row in the table is `keyword = score`. The engine searches for whole-word matches and returns the score for the first keyword that matches.
 
@@ -211,15 +219,18 @@ Successfully contained alerts get a score reduction because antivirus handled th
 
 ---
 
-### Stage 3 — Unresolved Hard Override
+### Stage 3 — Hard Overrides
 
-After all adjustments are calculated, the engine applies a final check:
+After all adjustments are calculated, the engine applies final checks that can force Critical severity:
 
-> If the remediation outcome is **failed or unresolved**, the final score is forced directly to **100**, bypassing the normal 0–100 clamp and overriding whatever the base + contextual sum would have been.
+1. If the remediation outcome is **failed or unresolved**, the final score is forced directly to **100**, bypassing the normal 0–100 clamp and overriding whatever the base + contextual sum would have been.
+2. If the same threat reaches the repeat threshold on the same host across multiple days within a 7-day cluster, the final score is also forced to **100**.
 
-This means a low-category threat (e.g. adware with base score 15) that antivirus could not remove is treated as Critical, because an active unresolved infection is operationally critical regardless of threat type.
+This means a low-category threat that antivirus could not remove is treated as Critical, because an active unresolved infection is operationally critical regardless of threat type. It also means clustered repeat activity, such as the same packed script appearing on the same endpoint across multiple days in a week, is treated as Critical even if individual detections were terminated.
 
-If the outcome is not failed, the score is clamped to the range `[0, 100]`.
+The repeat override is intentionally clustered to a 7-day window. Older, spaced-out detections can still raise the score through persistence, but they do not automatically become Critical just because the same user or machine has historical phishing noise.
+
+If no override fires, the score is clamped to the range `[0, 100]`.
 
 ---
 
@@ -253,8 +264,9 @@ base_score              (taxonomy keyword match, or unknown_base_score)
 
 = adjusted_score        (clamped to 0–100)
 
-IF unresolved_override: final = 100
-ELSE:                   final = adjusted_score
+IF unresolved_override:        final = 100
+ELSE IF repeat_cluster_override: final = 100
+ELSE:                          final = adjusted_score
 
 → severity_label        (Critical / High / Medium / Low by thresholds)
 ```
@@ -292,8 +304,9 @@ Escalation logic lives in `app/rules.py`.
 After scoring, the escalation engine decides whether to send a Teams notification:
 
 1. **Unresolved/failed override** — if the remediation outcome is failed or unresolved, escalate regardless of score.
-2. **Critical severity** — if the scored severity label is Critical, escalate.
-3. **Everything else** — no escalation.
+2. **Persistent repeat override** — if the same threat crosses the repeat threshold on the same host across multiple days within 7 days, escalate as Critical.
+3. **Critical severity** — if the scored severity label is Critical, escalate.
+4. **Everything else** — no escalation.
 
 For eligible alerts, escalation is further gated by a **cooldown fingerprint**:
 
@@ -309,9 +322,23 @@ Non-escalated alerts are still stored in SQLite and visible on the dashboard. Th
 
 The Acronis dashboard (`/acronis`) connects to a Microsoft 365 mailbox and uses the same date preset/backfill behavior as ESET. It has its own configuration page (`/acronis/settings`) with independent mailbox, folder, sender, and subject filters.
 
-The dashboard currently shows the same ESET-style Alerts and Escalations panel structure, but Acronis parsing is disabled until real notification samples are available. The sync layer still validates mailbox access, scans configured ranges, records last-scan state, and polls in the background.
+The parser reads Acronis daily status report and active-alert email content into dashboard rows with:
 
-When parsing is enabled later, Acronis alert severity categories (Critical, Error, Warning, Information) should come directly from Acronis notification content rather than the ESET scoring engine.
+- Received (PT)
+- Company
+- Machine
+- Backup (`Fail` / `Pass`)
+- Reason
+- Derived Severity
+
+The vendor labels (Critical, Error, Warning, Information) are preserved as input evidence, but the visible dashboard severity is derived from a separate Acronis triage model. That model is intentionally designed to reduce noise:
+
+- Storage, disk health, repository, capacity, auth/license, agent/service, server-like assets, new patterns, and spread across machines increase severity.
+- Operating system restarts, closed backup windows, stale workstation offline alerts, repeated unchanged patterns, successful/info cases, and long-running offline endpoints reduce severity.
+- Critical Acronis cases are eligible for Teams only when the push gate passes.
+- Teams messages are capped to one message per company/machine in a 24-hour period.
+
+This is separate from the ESET malware scoring model. Acronis status is operational evidence, not a direct Teams trigger.
 
 ---
 
@@ -319,7 +346,7 @@ When parsing is enabled later, Acronis alert severity categories (Critical, Erro
 
 The Xymon dashboard (`/xymon`) connects to a Microsoft 365 mailbox and uses the same date preset/backfill behavior as ESET. It has its own configuration page (`/xymon/settings`) with independent mailbox, folder, sender, subject, host, test, and status filters.
 
-The dashboard currently shows the same ESET-style Alerts and Escalations panel structure, but Xymon parsing is disabled until real notification samples are available. The sync layer still validates mailbox access, scans configured ranges, records last-scan state, and polls in the background.
+The dashboard currently shows the same shared Alerts and Escalations panel structure, but Xymon parsing is disabled until notification output and routing are finalized. The sync layer still validates mailbox access, scans configured ranges, records last-scan state, and polls in the background.
 
 `app/xymon_parser.py` is present as a scaffold for future Xymon email parsing once sample messages are available.
 
@@ -460,13 +487,28 @@ Teams escalation policy:
 
 - Critical severity alerts are eligible for Teams.
 - Failed or unresolved remediation forces Critical severity and is eligible for Teams.
+- Clustered same-host, same-threat ESET repeats can force Critical when they cross the threshold across multiple days within 7 days.
+- Acronis Critical derived severity can post to Teams only after the Acronis push gate passes.
 - Teams posts are capped per client during the configured escalation cooldown.
+- Acronis Teams posts are capped per company/machine for 24 hours.
 - Client identity uses ESET client name, then hostname, then computer name.
 - Non-escalated alerts remain in SQLite for dashboard history and investigation.
 
 ---
 
 ## Dashboard
+
+All dashboards share the same visual system:
+
+- Large dashboard switcher in the top toolbar with hover-open menu
+- Connected mailbox and sync status panels
+- Light/dark theme toggle with screenshot-stable rendering
+- Date presets, compact custom date-range picker, and global search
+- Tactile hover states on toolbar panels, stat cards, headers, and rows
+- Collapsible Analytics, Alerts, and Escalations sections with matching chevron/count styling
+- Truncated values expose the full value on hover via native titles
+
+Design choices are deliberately conservative: the dashboards reuse one panel, table, badge, filter, and toolbar language instead of inventing alert-type-specific UI. Each tab changes labels and data mapping, not the visual grammar.
 
 The ESET dashboard provides:
 
@@ -475,24 +517,31 @@ The ESET dashboard provides:
 - Repeated threats
 - Unresolved cases
 - 24-hour Critical escalations
+- Collapsible analytics for severity mix, trend, top methods, and top companies
 - Recent alerts table
 - Clickable escalation feed
 - Alert detail pages with raw email body and historical matches
+- Table layout: Received (PT), Company, User, Machine, Method, Status, Severity
+- Method is a short readable label such as Phishing, Redirect, Packed, or Downloader; hovering reveals the full threat name
 - Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr
 
 The Acronis dashboard provides:
 
-- Critical / Error / Warning / Information counts
+- Critical / Error / Warning / Information vendor status counts on the stat cards
+- Acronis-derived severity in the Alerts table
+- Parsed daily status report rows with company abbreviations, machine, backup result, and reason
+- Clickable severity badges that show score calculation details
+- Acronis severity help popover and full scoring controls on Configure
+- Push Review / Escalations panel for Teams-eligible Critical Acronis cases
 - Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr
 - Mailbox sync status and scan coverage tracking
-- Blank ESET-style Alerts and Escalations panels until parsing is enabled
 
 The Xymon dashboard provides:
 
 - Red / Yellow / Purple / Green status counts
 - Date presets: Today, 7d, 30d, 60d, 90d, 6mo, 1yr
 - Mailbox sync status and scan coverage tracking
-- Blank ESET-style Alerts and Escalations panels until parsing is enabled
+- Shared Alerts and Escalations panels while parsing remains disabled
 
 Switch between dashboards using the dropdown in the top-left nav.
 
@@ -527,7 +576,7 @@ python -m app.scanner --sample
 
 The scanner processes each unique Graph `message_id` only once.
 
-Acronis and Xymon run their own background scanners while the web app is running. They currently validate mailbox access and update scan state, but parsing/storage is disabled until sample notification emails are available.
+Acronis and Xymon run their own background scanners while the web app is running. Acronis parses and stores supported backup alert emails. Xymon currently validates mailbox access and updates scan state, but parsing/storage remains disabled until notification samples and routing are finalized.
 
 All three monitors poll every `APP_POLL_INTERVAL_SECONDS` seconds while the FastAPI app is running. The default is 60 seconds.
 
@@ -670,12 +719,15 @@ app/
   database.py
   graph_client.py
   parser.py
+  acronis_parser.py
   scoring.py
   storage.py
   rules.py
   teams_notifier.py
   scanner.py
   security.py
+  company_abbreviations.py
+  company_abbreviations.csv
 
 app/routes/
   dashboard.py
@@ -694,6 +746,8 @@ app/templates/
   acronis_dashboard.html
   acronis_settings.html
   alert_detail.html
+  acronis_alert_detail.html
+  xymon_dashboard.html
 
 app/static/
   style.css
