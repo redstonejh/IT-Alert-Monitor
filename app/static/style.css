@@ -6420,6 +6420,15 @@ html[data-theme="dark"] .layout-slot-trigger:hover {
   box-shadow: 0 8px 18px rgba(0, 0, 0, .28), 0 0 18px rgba(103, 169, 255, .10);
 }
 
+html[data-theme="dark"] .range-bar.widget-card {
+  --range-control-fg: color-mix(in srgb, var(--range-control-accent) 46%, #f8fbff);
+  --range-control-bg: color-mix(in srgb, var(--surface-raised) 84%, var(--range-control-accent) 16%);
+  --range-control-border: color-mix(in srgb, var(--range-control-accent) 42%, #40536e);
+  --range-control-active-bg: color-mix(in srgb, var(--surface-raised) 76%, var(--range-control-accent) 24%);
+  --range-control-active-border: color-mix(in srgb, var(--range-control-accent) 62%, #dbeafe);
+  --range-control-glow: rgba(var(--panel-accent-rgb, 103, 169, 255), .10);
+}
+
 html[data-theme="dark"] .range-bar.widget-card .range-search-input,
 html[data-theme="dark"] .range-bar.widget-card .preset-btn,
 html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger,
@@ -6427,7 +6436,7 @@ html[data-theme="dark"] .range-bar.widget-card .range-display {
   background: var(--range-control-bg);
   border-color: var(--range-control-border);
   color: var(--range-control-fg);
-  box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .18), 0 0 8px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .10);
 }
 
 html[data-theme="dark"] .range-bar.widget-card .range-search:hover .range-search-input,
@@ -6437,10 +6446,10 @@ html[data-theme="dark"] .range-bar.widget-card .preset-btn.active,
 html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger:hover,
 html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger:focus-visible,
 html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger.active {
-  background: color-mix(in srgb, var(--range-control-bg) 75%, var(--panel-hover-tint));
+  background: var(--range-control-active-bg);
   border-color: var(--range-control-active-border);
   color: var(--range-control-fg);
-  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .22), 0 0 10px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 html[data-theme="dark"] .range-bar.widget-card .range-search:focus-within .range-search-label,
