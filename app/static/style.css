@@ -1764,7 +1764,10 @@ pre {
 
 .range-bar.widget-card {
   --range-control-accent: var(--panel-accent, var(--blue));
-  --range-control-fg: #ffffff;
+  --range-control-fg: var(--panel-accent-text, var(--blue));
+  --range-button-fg: #ffffff;
+  --range-search-fg: var(--ink-strong);
+  --range-search-muted: var(--muted-strong);
   --range-control-bg: color-mix(in srgb, var(--surface-raised) 62%, var(--range-control-accent) 38%);
   --range-control-border: color-mix(in srgb, var(--range-control-accent) 54%, var(--panel-hover-tint));
   --range-control-active-border: color-mix(in srgb, var(--range-control-accent) 72%, var(--panel-hover-tint));
@@ -1866,8 +1869,8 @@ pre {
   padding: 0 14px 0 34px;
   border: 1.5px solid var(--range-control-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-raised) 88%, var(--range-control-fg) 12%);
-  color: var(--range-control-fg);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--range-control-accent) 12%);
+  color: var(--range-search-fg);
   box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .15s ease;
 }
@@ -1879,7 +1882,7 @@ pre {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--surface);
-  color: var(--muted-strong);
+  color: var(--range-search-muted);
   line-height: 1;
   transform: translateY(-50%);
   transform-origin: left center;
@@ -1890,7 +1893,7 @@ pre {
 .range-search-input:focus + .range-search-label,
 .range-search-input:not(:placeholder-shown) + .range-search-label {
   top: 0;
-  color: var(--range-control-fg);
+  color: var(--range-search-fg);
   font-size: 10px;
   transform: translateY(-50%) scale(.96);
 }
@@ -1902,7 +1905,7 @@ pre {
   top: 50%;
   width: 12px;
   height: 12px;
-  border: 2px solid var(--range-control-fg);
+  border: 2px solid var(--range-search-muted);
   border-radius: 999px;
   transform: translateY(-55%);
   pointer-events: none;
@@ -1917,7 +1920,7 @@ pre {
   width: 7px;
   height: 2px;
   border-radius: 999px;
-  background: var(--range-control-fg);
+  background: var(--range-search-muted);
   transform: rotate(45deg);
   pointer-events: none;
   z-index: 1;
@@ -1936,11 +1939,11 @@ pre {
 }
 
 .range-search:focus-within::before {
-  border-color: var(--range-control-fg);
+  border-color: var(--range-search-fg);
 }
 
 .range-search:focus-within::after {
-  background: var(--range-control-fg);
+  background: var(--range-search-fg);
 }
 
 
@@ -1949,7 +1952,7 @@ pre {
 }
 
 .range-search-clear:hover {
-  color: var(--range-control-fg);
+  color: var(--range-search-fg);
 }
 
 .dashboard-search-hidden {
@@ -1967,7 +1970,7 @@ pre {
   border: 1.5px solid var(--range-control-border);
   border-radius: 999px;
   background: var(--range-control-bg);
-  color: var(--range-control-fg);
+  color: var(--range-button-fg);
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
@@ -1981,7 +1984,7 @@ pre {
 .preset-btn.active {
   background: color-mix(in srgb, var(--range-control-bg) 75%, var(--panel-hover-tint));
   border-color: var(--range-control-active-border);
-  color: var(--range-control-fg);
+  color: var(--range-button-fg);
 }
 
 .preset-btn:hover {
@@ -2032,7 +2035,7 @@ pre {
   border: 1.5px solid var(--range-control-border);
   border-radius: 999px;
   background: var(--range-control-bg);
-  color: var(--range-control-fg);
+  color: var(--range-button-fg);
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
@@ -2045,7 +2048,7 @@ pre {
   outline: none;
   border-color: var(--range-control-active-border);
   background: color-mix(in srgb, var(--range-control-bg) 75%, var(--panel-hover-tint));
-  color: var(--range-control-fg);
+  color: var(--range-button-fg);
 }
 
 .range-custom-trigger:hover {
@@ -2084,8 +2087,8 @@ pre {
   padding: 0 12px;
   border: 1.5px solid var(--range-control-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-raised) 88%, var(--range-control-fg) 12%);
-  color: var(--range-control-fg);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--range-control-accent) 12%);
+  color: var(--range-button-fg);
   white-space: nowrap;
   box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
 }
@@ -6421,7 +6424,10 @@ html[data-theme="dark"] .layout-slot-trigger:hover {
 }
 
 html[data-theme="dark"] .range-bar.widget-card {
-  --range-control-fg: #ffffff;
+  --range-control-fg: color-mix(in srgb, var(--range-control-accent) 46%, #f8fbff);
+  --range-button-fg: #ffffff;
+  --range-search-fg: #f8fbff;
+  --range-search-muted: #c5d3e6;
   --range-control-bg: color-mix(in srgb, var(--surface-raised) 84%, var(--range-control-accent) 16%);
   --range-control-border: color-mix(in srgb, var(--range-control-accent) 42%, #40536e);
   --range-control-active-bg: color-mix(in srgb, var(--surface-raised) 76%, var(--range-control-accent) 24%);
@@ -6435,8 +6441,17 @@ html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger,
 html[data-theme="dark"] .range-bar.widget-card .range-display {
   background: var(--range-control-bg);
   border-color: var(--range-control-border);
-  color: var(--range-control-fg);
   box-shadow: 0 4px 10px rgba(0, 0, 0, .18), 0 0 8px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+
+html[data-theme="dark"] .range-bar.widget-card .range-search-input {
+  color: var(--range-search-fg);
+}
+
+html[data-theme="dark"] .range-bar.widget-card .preset-btn,
+html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger,
+html[data-theme="dark"] .range-bar.widget-card .range-display {
+  color: var(--range-button-fg);
 }
 
 html[data-theme="dark"] .range-bar.widget-card .range-search:hover .range-search-input,
@@ -6448,14 +6463,26 @@ html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger:focus-visib
 html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger.active {
   background: var(--range-control-active-bg);
   border-color: var(--range-control-active-border);
-  color: var(--range-control-fg);
   box-shadow: 0 6px 14px rgba(0, 0, 0, .22), 0 0 10px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
+}
+
+html[data-theme="dark"] .range-bar.widget-card .range-search:hover .range-search-input,
+html[data-theme="dark"] .range-bar.widget-card .range-search-input:focus {
+  color: var(--range-search-fg);
+}
+
+html[data-theme="dark"] .range-bar.widget-card .preset-btn:hover,
+html[data-theme="dark"] .range-bar.widget-card .preset-btn.active,
+html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger:hover,
+html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger:focus-visible,
+html[data-theme="dark"] .range-bar.widget-card .range-custom-trigger.active {
+  color: var(--range-button-fg);
 }
 
 html[data-theme="dark"] .range-bar.widget-card .range-search:focus-within .range-search-label,
 html[data-theme="dark"] .range-bar.widget-card .range-search-input:focus + .range-search-label,
 html[data-theme="dark"] .range-bar.widget-card .range-search-input:not(:placeholder-shown) + .range-search-label {
-  color: var(--range-control-fg);
+  color: var(--range-search-fg);
 }
 
 html[data-theme="dark"] .app-nav:not(.settings-nav) .nav-status-item:hover,
