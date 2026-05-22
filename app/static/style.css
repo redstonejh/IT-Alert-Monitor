@@ -1764,7 +1764,7 @@ pre {
 
 .range-bar.widget-card {
   --range-control-accent: var(--panel-accent, var(--blue));
-  --range-control-fg: var(--panel-accent-text, var(--blue));
+  --range-control-fg: #ffffff;
   --range-control-bg: color-mix(in srgb, var(--surface-raised) 62%, var(--range-control-accent) 38%);
   --range-control-border: color-mix(in srgb, var(--range-control-accent) 54%, var(--panel-hover-tint));
   --range-control-active-border: color-mix(in srgb, var(--range-control-accent) 72%, var(--panel-hover-tint));
@@ -6421,7 +6421,7 @@ html[data-theme="dark"] .layout-slot-trigger:hover {
 }
 
 html[data-theme="dark"] .range-bar.widget-card {
-  --range-control-fg: color-mix(in srgb, var(--range-control-accent) 46%, #f8fbff);
+  --range-control-fg: #ffffff;
   --range-control-bg: color-mix(in srgb, var(--surface-raised) 84%, var(--range-control-accent) 16%);
   --range-control-border: color-mix(in srgb, var(--range-control-accent) 42%, #40536e);
   --range-control-active-bg: color-mix(in srgb, var(--surface-raised) 76%, var(--range-control-accent) 24%);
