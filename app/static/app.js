@@ -2938,6 +2938,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const order = [...layout.querySelectorAll(":scope > .db-panel")].length;
       const panel = createCustomPanel(definition);
       panel.dataset.defaultOrder = String(order);
+      panel.classList.add("db-panel-collapsed");
+      panel.dataset.gridRowSpan = "1";
       applyPanelSpan(panel, 1);
       applyPanelColor(panel, nextColor);
       applyPanelTitleColor(panel, "#ffffff");
