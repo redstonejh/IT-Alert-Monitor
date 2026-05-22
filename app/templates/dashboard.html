@@ -48,7 +48,6 @@
     <button class="panel-reset-button" type="button" data-layout-target="eset" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
     <button class="panel-undo-button" type="button" data-layout-target="eset" aria-label="Undo last layout change" title="Undo last layout change">Undo</button>
     <button class="layout-slot-button layout-group-button" type="button" data-layout-target="eset" aria-pressed="false" title="Select widgets or panels as a group">Group</button>
-    <button class="layout-slot-button layout-normalize-button" type="button" data-layout-target="eset" title="Normalize selected group size">Normalize</button>
     <details class="nav-status-menu">
       <summary class="nav-status-item nav-status-icon-only {% if config.mailbox_address or config.oauth_account %}nav-status-good{% else %}nav-status-bad{% endif %}" aria-label="{% if config.mailbox_address or config.oauth_account %}Mailbox connected: {{ config.mailbox_address or config.oauth_account }}{% else %}Mailbox not connected{% endif %}" title="{% if config.mailbox_address or config.oauth_account %}Mailbox connected: {{ config.mailbox_address or config.oauth_account }}{% else %}Mailbox not connected{% endif %}">
         <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
@@ -134,8 +133,9 @@
 </section>
 {% endif %}
 
+<div class="dashboard-layout-grid" data-dashboard-layout-key="eset">
 <div class="stat-band widget-layout" data-widget-layout-key="eset">
-  <nav class="range-bar widget-card" data-widget-key="eset-time-filters" data-widget-type="controls" data-default-span="12" aria-label="Dashboard view range">
+  <nav class="range-bar widget-card" data-widget-key="eset-time-filters" data-widget-type="controls" data-default-span="6" aria-label="Dashboard view range">
     <div class="range-controls">
       <div class="range-presets">
         {% for preset in range_presets %}
@@ -169,30 +169,30 @@
       {% endif %}
     </form>
   </nav>
-  <a class="stat-card widget-card {% if not active_metric or active_metric == 'total' %}active{% endif %}" data-widget-key="eset-total" data-widget-type="tracker" data-default-span="3" href="/dashboard?{{ range_query }}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if not active_metric or active_metric == 'total' %}active{% endif %}" data-widget-key="eset-total" data-widget-type="tracker" data-default-span="1" href="/dashboard?{{ range_query }}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.total }}</span>
     <span class="stat-lbl">Total alerts</span>
   </a>
-  <a class="stat-card widget-card {% if active_metric == 'critical' %}active{% endif %}" data-widget-key="eset-critical" data-widget-type="tracker" data-default-span="3" href="/dashboard?{{ range_query }}&metric=critical{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'critical' %}active{% endif %}" data-widget-key="eset-critical" data-widget-type="tracker" data-default-span="1" href="/dashboard?{{ range_query }}&metric=critical{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.critical }}</span>
     <span class="stat-lbl">Critical clients</span>
   </a>
-  <a class="stat-card widget-card {% if active_metric == 'repeated' %}active{% endif %}" data-widget-key="eset-repeated" data-widget-type="tracker" data-default-span="3" href="/dashboard?{{ range_query }}&metric=repeated{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'repeated' %}active{% endif %}" data-widget-key="eset-repeated" data-widget-type="tracker" data-default-span="1" href="/dashboard?{{ range_query }}&metric=repeated{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.repeated }}</span>
     <span class="stat-lbl">Repeated threats</span>
   </a>
-  <a class="stat-card widget-card {% if active_metric == 'unresolved' %}active{% endif %}" data-widget-key="eset-unresolved" data-widget-type="tracker" data-default-span="3" href="/dashboard?{{ range_query }}&metric=unresolved{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'unresolved' %}active{% endif %}" data-widget-key="eset-unresolved" data-widget-type="tracker" data-default-span="1" href="/dashboard?{{ range_query }}&metric=unresolved{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.failed }}</span>
     <span class="stat-lbl">Unresolved</span>
   </a>
-  <a class="stat-card widget-card {% if active_metric == 'escalated' %}active{% endif %}" data-widget-key="eset-escalated" data-widget-type="tracker" data-default-span="3" href="/dashboard?{{ range_query }}&metric=escalated{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'escalated' %}active{% endif %}" data-widget-key="eset-escalated" data-widget-type="tracker" data-default-span="1" href="/dashboard?{{ range_query }}&metric=escalated{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ stats.teams_logged }}</span>
     <span class="stat-lbl">Escalated cases</span>
   </a>
 </div>
 
 <div class="panel-layout" data-layout-key="eset">
-<section class="db-panel analytics-panel db-panel-collapsed" data-collapse-default="closed" data-panel-key="eset-analytics" data-default-span="12">
+<section class="db-panel analytics-panel db-panel-collapsed" data-collapse-default="closed" data-panel-key="eset-analytics" data-default-span="6">
   <div class="db-panel-hd db-panel-hd-analytics">
     <span class="db-panel-title">Analytics</span>
     <span class="db-panel-count">{{ visualizations.total }}</span>
@@ -282,7 +282,7 @@
   </div>
 </section>
 
-  <div class="db-panel" data-panel-key="eset-alerts" data-default-span="8">
+  <div class="db-panel" data-panel-key="eset-alerts" data-default-span="4">
     <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">{{ metric_label }}</span>
       <span class="db-panel-count">{{ recent_alerts | length }}</span>
@@ -352,7 +352,7 @@
     </div>
   </div>
 
-  <div class="db-panel" data-panel-key="eset-escalations" data-default-span="4">
+  <div class="db-panel" data-panel-key="eset-escalations" data-default-span="2">
     <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">{{ teams_messages | length }}</span>
@@ -393,6 +393,7 @@
     </div>
   </div>
 
+</div>
 </div>
 
 <div class="severity-popover" id="severity-help-popover" popover>

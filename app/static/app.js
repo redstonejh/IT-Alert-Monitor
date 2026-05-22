@@ -304,13 +304,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  const panelStoragePrefix = "dashboard-panel-layout:";
+  const panelStoragePrefix = "dashboard-panel-six-grid-layout:";
   const panelProfilePrefix = "dashboard-panel-profile:";
   const customPanelsPrefix = "dashboard-custom-panels:";
   const hiddenPanelsPrefix = "dashboard-hidden-panels:";
-  const widgetStoragePrefix = "dashboard-widget-layout:";
-  const customWidgetsPrefix = "dashboard-custom-widgets:";
-  const hiddenWidgetsPrefix = "dashboard-hidden-widgets:";
+  const widgetStoragePrefix = "dashboard-widget-six-grid-layout:";
+  const customWidgetsPrefix = "dashboard-custom-six-grid-widgets:";
+  const hiddenWidgetsPrefix = "dashboard-hidden-six-grid-widgets:";
   const layoutUndoPrefix = "dashboard-layout-undo:";
   const getActivePanelProfile = (layoutKey) => {
     try {
@@ -372,11 +372,17 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   let groupMode = false;
   const groupSelection = new Set();
+  const groupSelectedIds = new Set();
   const groupItemKind = (item) => item?.classList?.contains("widget-card") ? "widget" : "panel";
   const groupItemLayout = (item) => item?.closest?.(".widget-layout, .panel-layout");
   const groupItemLayoutKey = (item) => {
     const layout = groupItemLayout(item);
     return layout?.dataset.widgetLayoutKey || layout?.dataset.layoutKey || "default";
+  };
+  const groupItemId = (item) => {
+    if (!item) return "";
+    const key = groupItemKind(item) === "widget" ? item.dataset.widgetKey : item.dataset.panelKey;
+    return key ? `${groupItemKind(item)}:${groupItemLayoutKey(item)}:${key}` : "";
   };
   const selectedGroupItems = (kind, layoutKey) => [...groupSelection].filter((item) => {
     if (!item?.isConnected || item.hidden) return false;
@@ -384,9 +390,39 @@ document.addEventListener("DOMContentLoaded", () => {
     if (layoutKey && groupItemLayoutKey(item) !== layoutKey) return false;
     return true;
   });
-  const clearGroupSelection = () => {
-    groupSelection.forEach((item) => item.classList.remove("group-selected"));
+  const setGroupItemSelected = (item, selected) => {
+    const id = groupItemId(item);
+    if (!id) return;
+    item.classList.toggle("group-selected", selected);
+    item.setAttribute("aria-selected", selected.toString());
+    if (selected) {
+      groupSelection.add(item);
+      groupSelectedIds.add(id);
+    } else {
+      groupSelection.delete(item);
+      groupSelectedIds.delete(id);
+    }
+  };
+  const restoreGroupSelection = () => {
     groupSelection.clear();
+    document.querySelectorAll(".widget-layout > .widget-card, .panel-layout > .db-panel").forEach((item) => {
+      const selected = groupSelectedIds.has(groupItemId(item));
+      item.classList.toggle("group-selected", selected);
+      if (selected) {
+        item.setAttribute("aria-selected", "true");
+        groupSelection.add(item);
+      } else if (!item.classList.contains("active")) {
+        item.removeAttribute("aria-selected");
+      }
+    });
+  };
+  const clearGroupSelection = () => {
+    groupSelection.forEach((item) => {
+      item.classList.remove("group-selected");
+      if (!item.classList.contains("active")) item.removeAttribute("aria-selected");
+    });
+    groupSelection.clear();
+    groupSelectedIds.clear();
   };
   const syncGroupButtons = () => {
     document.body.classList.toggle("group-select-active", groupMode);
@@ -401,13 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const toggleGroupItem = (item) => {
     if (!item) return;
-    if (groupSelection.has(item)) {
-      groupSelection.delete(item);
-      item.classList.remove("group-selected");
-    } else {
-      groupSelection.add(item);
-      item.classList.add("group-selected");
-    }
+    setGroupItemSelected(item, !groupSelectedIds.has(groupItemId(item)));
   };
   const groupPeers = (source, kind = groupItemKind(source)) => {
     if (!source?.classList?.contains("group-selected")) return [];
@@ -434,7 +464,13 @@ document.addEventListener("DOMContentLoaded", () => {
     widgets: [...document.querySelectorAll(`.widget-layout[data-widget-layout-key="${CSS.escape(layoutKey)}"]`)].map((layout) => ({
       selector: `.widget-layout[data-widget-layout-key="${CSS.escape(layout.dataset.widgetLayoutKey || layoutKey)}"]`,
       hiddenDraft: layout.dataset.hiddenWidgetsDraft || "[]",
-      items: [...layout.querySelectorAll(":scope > .widget-card")].map((item) => serializeLayoutElement(item, "widgetKey")),
+      items: [...layout.querySelectorAll(":scope > .widget-card, :scope > .widget-row-break, :scope > .widget-spacer")].map((item) => (
+        item.classList.contains("widget-row-break")
+          ? { rowBreak: true, html: item.outerHTML }
+          : item.classList.contains("widget-spacer")
+            ? { spacer: true, html: item.outerHTML }
+          : serializeLayoutElement(item, "widgetKey")
+      )),
     })),
     profile,
   });
@@ -452,12 +488,12 @@ document.addEventListener("DOMContentLoaded", () => {
       template.innerHTML = item.html;
       const element = template.content.firstElementChild;
       if (!element) return;
-      if (!item.rowBreak) element.hidden = Boolean(item.hidden);
+      if (!item.rowBreak && !item.spacer) element.hidden = Boolean(item.hidden);
       delete element.dataset.panelInitialized;
       delete element.dataset.widgetInitialized;
       element.classList.remove("db-panel-tools-open", "widget-tools-open", "db-panel-dragging", "widget-dragging");
       layout.appendChild(element);
-      if (!item.rowBreak) initItem?.(element);
+      if (!item.rowBreak && !item.spacer) initItem?.(element);
     });
   };
   const captureLayoutUndo = (layoutKey, profile = getActivePanelProfile(layoutKey)) => {
@@ -485,6 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!layout) return;
         layout.dataset.hiddenWidgetsDraft = snapshot.hiddenDraft;
         restoreLayoutItems(layout, snapshot.items, layout.__initWidget);
+        cleanupWidgetRowBreaks(layout);
       });
       undo.panels.forEach((snapshot) => {
         const layout = document.querySelector(snapshot.selector);
@@ -493,6 +530,7 @@ document.addEventListener("DOMContentLoaded", () => {
         restoreLayoutItems(layout, snapshot.items, layout.__initPanel);
         cleanupPanelRowBreaks(layout);
       });
+      restoreGroupSelection();
       liveLayoutUndo.set(liveKey, stack);
       syncLayoutToolsActive();
       return true;
@@ -538,6 +576,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!target.dataset.customPanel && !hidden.includes(target.dataset.panelKey)) hidden.push(target.dataset.panelKey);
       groupSelection.delete(target);
       target.classList.remove("group-selected");
+      groupSelectedIds.delete(groupItemId(target));
       if (target.dataset.customPanel) {
         target.remove();
       } else {
@@ -565,14 +604,244 @@ document.addEventListener("DOMContentLoaded", () => {
     panel.style.setProperty("--panel-min-width", `${getPanelMinimumWidth(panel)}px`);
   };
 
+  const DASHBOARD_GRID_COLUMNS = 6;
+  const DASHBOARD_GRID_ROW_HEIGHT = 81;
+
+  const gridHostForLayout = (layout) => layout?.closest?.(".dashboard-layout-grid") || layout;
+
+  const gridRectForLayout = (layout) => {
+    const host = gridHostForLayout(layout);
+    return (host || layout).getBoundingClientRect();
+  };
+
+  const gridGapForLayout = (layout) => {
+    if (!layout) return 16;
+    const host = gridHostForLayout(layout);
+    const computed = window.getComputedStyle(host || layout);
+    const rawGap = computed.rowGap || computed.gap || (layout.classList.contains("widget-layout") ? "12px" : "16px");
+    const gap = parseFloat(rawGap);
+    return Number.isFinite(gap) ? gap : (layout.classList.contains("widget-layout") ? 12 : 16);
+  };
+
+  const gridHeightForRows = (rows, gap) => {
+    const safeRows = Math.max(1, Math.round(Number(rows) || 1));
+    return (safeRows * DASHBOARD_GRID_ROW_HEIGHT) + (Math.max(0, safeRows - 1) * gap);
+  };
+
+  const gridRowsFromHeight = (height, gap, minRows = 1) => {
+    const safeHeight = Math.max(1, Number(height) || DASHBOARD_GRID_ROW_HEIGHT);
+    return Math.max(minRows, Math.ceil((safeHeight + gap) / (DASHBOARD_GRID_ROW_HEIGHT + gap)));
+  };
+
+  const isWidgetGridItem = (item) => item?.classList?.contains("widget-card") || item?.classList?.contains("widget-placeholder");
+
+  const gridItemLayoutKey = (layout) => layout?.dataset.widgetLayoutKey || layout?.dataset.layoutKey || "default";
+
+  const saveSharedGridLayouts = (layout) => {
+    const host = gridHostForLayout(layout);
+    const key = gridItemLayoutKey(layout);
+    if (layout?.classList?.contains("widget-layout")) {
+      saveWidgetLayouts(layout);
+      const panelLayout = host?.querySelector?.(`.panel-layout[data-layout-key="${CSS.escape(key)}"]`);
+      if (panelLayout) savePanelLayouts(panelLayout);
+    } else {
+      savePanelLayouts(layout);
+      const widgetLayout = host?.querySelector?.(`.widget-layout[data-widget-layout-key="${CSS.escape(key)}"]`);
+      if (widgetLayout) saveWidgetLayouts(widgetLayout);
+    }
+  };
+
+  const panelMinimumRows = (panel) => {
+    if (panel.classList.contains("db-panel-collapsed")) return 1;
+    const layout = panel.closest(".panel-layout");
+    return gridRowsFromHeight(getPanelMinimumHeight(panel), gridGapForLayout(layout), 1);
+  };
+
+  const gridItemRowSpan = (item) => {
+    if (item.classList.contains("widget-card") || item.classList.contains("widget-placeholder")) return 1;
+    const layout = item.closest(".panel-layout");
+    const gap = gridGapForLayout(layout);
+    const measuredHeight = Number(item.dataset.savedHeight) || item.getBoundingClientRect().height || DASHBOARD_GRID_ROW_HEIGHT;
+    const minRows = item.classList.contains("db-panel-placeholder") ? 1 : panelMinimumRows(item);
+    return Math.max(1, Math.round(Number(item.dataset.gridRowSpan) || gridRowsFromHeight(measuredHeight, gap, minRows)));
+  };
+
   const applyPanelSpan = (panel, span) => {
-    const safeSpan = Math.max(3, Math.min(12, Number(span) || Number(panel.dataset.defaultSpan) || 12));
-    const displaySpan = Number(safeSpan.toFixed(3));
-    const gap = 16;
-    const columnGaps = Math.max(0, displaySpan - 1);
-    panel.style.gridColumn = `span ${Math.ceil(displaySpan)}`;
-    panel.style.setProperty("--panel-basis", `calc(((100% - ${gap * 11}px) / 12 * ${displaySpan}) + ${columnGaps * gap}px)`);
+    const rawSpan = Number(span) || Number(panel.dataset.defaultSpan) || 6;
+    const safeSpan = Math.max(1, Math.min(6, rawSpan > 6 ? rawSpan / 2 : rawSpan));
+    const displaySpan = Math.round(safeSpan);
     panel.dataset.currentSpan = String(displaySpan);
+    if (panel.dataset.gridCol && panel.dataset.gridRow) {
+      const currentCol = Number(panel.dataset.gridCol) || 1;
+      const currentRow = Number(panel.dataset.gridRow) || 1;
+      const safeCol = Math.max(1, Math.min(7 - displaySpan, currentCol));
+      panel.dataset.gridCol = String(safeCol);
+      panel.dataset.gridRow = String(Math.max(1, currentRow));
+      panel.style.gridColumn = `${safeCol} / span ${displaySpan}`;
+      panel.style.gridRow = `${panel.dataset.gridRow} / span ${gridItemRowSpan(panel)}`;
+    } else {
+      panel.style.gridColumn = `span ${displaySpan}`;
+      panel.style.removeProperty("grid-row");
+    }
+    panel.style.removeProperty("width");
+    panel.style.removeProperty("--panel-basis");
+  };
+
+  const applyPanelGridPosition = (panel, col, row) => {
+    const span = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 6;
+    const safeSpan = Math.max(1, Math.min(6, Math.round(span > 6 ? span / 2 : span)));
+    const safeCol = Math.max(1, Math.min(7 - safeSpan, Math.round(Number(col) || 1)));
+    const safeRow = Math.max(1, Math.round(Number(row) || 1));
+    const rowSpan = gridItemRowSpan(panel);
+    panel.dataset.gridCol = String(safeCol);
+    panel.dataset.gridRow = String(safeRow);
+    panel.dataset.gridRowSpan = String(rowSpan);
+    panel.style.gridColumn = `${safeCol} / span ${safeSpan}`;
+    panel.style.gridRow = `${safeRow} / span ${rowSpan}`;
+  };
+
+  const gridCellFromPoint = (layout, item, clientX, clientY) => {
+    const layoutRect = gridRectForLayout(layout);
+    const gap = gridGapForLayout(layout);
+    const columnWidth = (Math.max(1, layoutRect.width) - (gap * 5)) / 6;
+    const span = Number(item.dataset.currentSpan) || Number(item.dataset.defaultSpan) || 1;
+    const safeSpan = Math.max(1, Math.min(6, Math.round(span > 6 ? span / 2 : span)));
+    const itemWidth = (columnWidth * safeSpan) + (Math.max(0, safeSpan - 1) * gap);
+    const col = Math.round((clientX - layoutRect.left - (itemWidth / 2)) / (columnWidth + gap)) + 1;
+    const rowSpan = isWidgetGridItem(item) ? 1 : gridItemRowSpan(item);
+    const itemHeight = isWidgetGridItem(item) ? DASHBOARD_GRID_ROW_HEIGHT : gridHeightForRows(rowSpan, gap);
+    const row = Math.round((clientY - layoutRect.top - (itemHeight / 2)) / (DASHBOARD_GRID_ROW_HEIGHT + gap)) + 1;
+    return {
+      col: Math.max(1, Math.min(7 - safeSpan, col)),
+      row: Math.max(1, row),
+    };
+  };
+
+  const panelGridCellFromPoint = (layout, panel, clientX, clientY) => gridCellFromPoint(layout, panel, clientX, clientY);
+
+  const spanFromAlignedWidth = (layout, width, gap, minSpan) => {
+    const layoutWidth = Math.max(1, gridRectForLayout(layout).width);
+    const columnCount = (layout.classList.contains("widget-layout") || layout.classList.contains("panel-layout")) ? 6 : 12;
+    const columnWidth = (layoutWidth - (gap * (columnCount - 1))) / columnCount;
+    return Math.max(minSpan, Math.min(columnCount, (Math.max(1, width) + gap) / (columnWidth + gap)));
+  };
+
+  const alignedResizeSpan = ({ layout, item, currentSpan, gap, minSpan }) => {
+    const rect = item.getBoundingClientRect();
+    const layoutRect = gridRectForLayout(layout);
+    const tolerance = 18;
+    const candidates = [{ edge: layoutRect.right, priority: 1 }];
+    document.querySelectorAll(".widget-layout > .widget-card:not([hidden]), .panel-layout > .db-panel:not([hidden])").forEach((target) => {
+      if (target === item || target.hidden) return;
+      const targetRect = target.getBoundingClientRect();
+      if (Math.abs(targetRect.top - rect.top) < 8 && Math.abs(targetRect.left - rect.left) < 8) return;
+      candidates.push({ edge: targetRect.right, priority: 2 });
+      candidates.push({ edge: targetRect.left, priority: 3 });
+    });
+    const match = candidates
+      .map((candidate) => ({
+        ...candidate,
+        distance: Math.abs(rect.right - candidate.edge),
+      }))
+      .filter((candidate) => candidate.distance <= tolerance && candidate.edge > rect.left + 24)
+      .sort((a, b) => a.distance - b.distance || a.priority - b.priority)[0];
+    if (!match) return Math.round(currentSpan);
+    return spanFromAlignedWidth(layout, match.edge - rect.left, gap, minSpan);
+  };
+
+  const groupedWidgetReleaseSpan = (currentSpan, groupCount) => {
+    if (groupCount <= 1) return null;
+    const fillSpan = 6 / groupCount;
+    const nearestInteger = Math.round(currentSpan);
+    const fillDistance = Math.abs(currentSpan - fillSpan);
+    const integerDistance = Math.abs(currentSpan - nearestInteger);
+    if ((currentSpan * groupCount > 6) || fillDistance <= Math.max(.18, integerDistance + .08)) {
+      return fillSpan;
+    }
+    return null;
+  };
+
+  const groupedPanelReleaseSpan = (currentSpan, groupCount) => {
+    if (groupCount <= 1) return null;
+    const fillSpan = 6 / groupCount;
+    const nearestInteger = Math.round(currentSpan);
+    const fillDistance = Math.abs(currentSpan - fillSpan);
+    const integerDistance = Math.abs(currentSpan - nearestInteger);
+    if ((currentSpan * groupCount > 6) || fillDistance <= Math.max(.18, integerDistance + .08)) {
+      return fillSpan;
+    }
+    return null;
+  };
+
+  const visualDropPlacement = (targets, clientX, clientY) => {
+    if (targets.length < 2) return null;
+    const rows = [];
+    targets
+      .map((item) => ({ item, rect: item.getBoundingClientRect() }))
+      .sort((a, b) => Math.abs(a.rect.top - b.rect.top) > 12 ? a.rect.top - b.rect.top : a.rect.left - b.rect.left)
+      .forEach((entry) => {
+        const row = rows.find((candidate) => Math.abs(candidate.top - entry.rect.top) < 18);
+        if (row) {
+          row.items.push(entry);
+          row.top = Math.min(row.top, entry.rect.top);
+          row.bottom = Math.max(row.bottom, entry.rect.bottom);
+        } else {
+          rows.push({ top: entry.rect.top, bottom: entry.rect.bottom, items: [entry] });
+        }
+      });
+    rows.forEach((row) => row.items.sort((a, b) => a.rect.left - b.rect.left));
+    rows.sort((a, b) => a.top - b.top);
+    const nearestRowIndex = rows.reduce((bestIndex, row, index) => {
+      const center = (row.top + row.bottom) / 2;
+      const bestCenter = (rows[bestIndex].top + rows[bestIndex].bottom) / 2;
+      return Math.abs(clientY - center) < Math.abs(clientY - bestCenter) ? index : bestIndex;
+    }, 0);
+    const nearestRow = rows[nearestRowIndex];
+    const rowHeight = nearestRow.bottom - nearestRow.top;
+    const verticalInsideRow = clientY >= nearestRow.top - 8 && clientY <= nearestRow.bottom + 8;
+    const verticalBetweenRows = rows.some((row, index) => {
+      const nextRow = rows[index + 1];
+      if (!nextRow) return false;
+      return clientY > row.bottom + 10 && clientY < nextRow.top - 10;
+    });
+    const clearlyBelowLastRow = nearestRowIndex === rows.length - 1 && clientY > nearestRow.bottom + Math.max(14, rowHeight * .18);
+    const clearlyAboveFirstRow = nearestRowIndex === 0 && clientY < nearestRow.top - Math.max(14, rowHeight * .18);
+    const useExistingRow = verticalInsideRow && !verticalBetweenRows && !clearlyBelowLastRow && !clearlyAboveFirstRow;
+    const targetRowIndex = useExistingRow
+      ? nearestRowIndex
+      : (clientY > nearestRow.bottom ? nearestRowIndex + 1 : nearestRowIndex);
+    const referenceRow = rows[Math.min(targetRowIndex, rows.length - 1)] || nearestRow;
+    const referenceItems = referenceRow.items;
+    let columnIndex = referenceItems.length;
+    for (let index = 0; index < referenceItems.length; index += 1) {
+      const current = referenceItems[index].rect;
+      const next = referenceItems[index + 1]?.rect;
+      const boundary = next ? (current.right + next.left) / 2 : current.left + current.width / 2;
+      if (clientX < boundary) {
+        columnIndex = index;
+        break;
+      }
+    }
+    const beforeCount = rows.slice(0, targetRowIndex).reduce((total, row) => total + row.items.length, 0);
+    return {
+      index: Math.max(0, Math.min(targets.length, beforeCount + columnIndex)),
+      breakBefore: !useExistingRow,
+      columnIndex,
+    };
+  };
+
+  const widgetDropColumn = (layout, widget, clientX) => {
+    const layoutRect = gridRectForLayout(layout);
+    const widgetRect = widget.getBoundingClientRect();
+    const span = Number(widget.dataset.currentSpan) || Number(widget.dataset.defaultSpan) || 3;
+    const gap = 12;
+    const columnWidth = (Math.max(1, layoutRect.width) - (gap * 5)) / 6;
+    const itemWidth = (columnWidth * span) + (Math.max(0, span - 1) * gap);
+    const step = itemWidth + gap;
+    const maxColumn = Math.max(0, Math.floor(6 / Math.max(1, span)) - 1);
+    const visualCenterX = widgetRect.left + (widgetRect.width / 2);
+    const rawColumn = Math.round(((Number.isFinite(visualCenterX) ? visualCenterX : clientX) - layoutRect.left - (itemWidth / 2)) / Math.max(1, step));
+    return Math.max(0, Math.min(maxColumn, rawColumn));
   };
 
   const getPanelMinimumHeight = (panel) => {
@@ -585,10 +854,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!height) {
       panel.style.height = "";
       delete panel.dataset.savedHeight;
+      panel.dataset.gridRowSpan = String(panel.classList.contains("db-panel-collapsed") ? 1 : panelMinimumRows(panel));
+      if (panel.dataset.gridCol && panel.dataset.gridRow) applyPanelGridPosition(panel, panel.dataset.gridCol, panel.dataset.gridRow);
       return;
     }
-    const safeHeight = Math.max(getPanelMinimumHeight(panel), Number(height));
+    const layout = panel.closest(".panel-layout");
+    const gap = gridGapForLayout(layout);
+    const rows = gridRowsFromHeight(Number(height), gap, panelMinimumRows(panel));
+    const safeHeight = gridHeightForRows(rows, gap);
+    panel.dataset.gridRowSpan = String(rows);
     panel.dataset.savedHeight = String(safeHeight);
+    if (panel.dataset.gridCol && panel.dataset.gridRow) applyPanelGridPosition(panel, panel.dataset.gridCol, panel.dataset.gridRow);
     if (!panel.classList.contains("db-panel-collapsed")) {
       panel.style.height = `${safeHeight}px`;
     }
@@ -676,6 +952,8 @@ document.addEventListener("DOMContentLoaded", () => {
     panel.className = "db-panel db-panel-empty-custom";
     panel.dataset.panelKey = definition.key;
     panel.dataset.defaultSpan = String(definition.span || 4);
+    if (definition.gridCol) panel.dataset.gridCol = String(definition.gridCol);
+    if (definition.gridRow) panel.dataset.gridRow = String(definition.gridRow);
     panel.dataset.customPanel = "true";
     panel.dataset.defaultTitle = definition.title || "Panel";
     panel.innerHTML = `
@@ -713,6 +991,8 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem(panelStorageKey(layoutKey, key, profile), JSON.stringify({
           order: index,
           span: Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12,
+          gridCol: Number(panel.dataset.gridCol) || null,
+          gridRow: Number(panel.dataset.gridRow) || null,
           height: panel.dataset.savedHeight ? parseFloat(panel.dataset.savedHeight) : null,
           color: panel.dataset.panelColor || null,
           title: panel.dataset.panelTitle || null,
@@ -727,6 +1007,8 @@ document.addEventListener("DOMContentLoaded", () => {
         title: panel.dataset.panelTitle || panel.querySelector(".db-panel-title")?.textContent?.trim() || "Panel",
         color: panel.dataset.panelColor || panel.querySelector(".panel-color-toggle")?.dataset.defaultTheme || "#2563eb",
         span: Number(panel.dataset.defaultSpan) || 4,
+        gridCol: Number(panel.dataset.gridCol) || null,
+        gridRow: Number(panel.dataset.gridRow) || null,
       }));
     try {
       localStorage.setItem(customPanelsKey(layoutKey, profile), JSON.stringify(customPanels));
@@ -741,11 +1023,53 @@ document.addEventListener("DOMContentLoaded", () => {
     return rowBreak;
   };
 
+  const createWidgetRowBreak = () => {
+    const rowBreak = document.createElement("div");
+    rowBreak.className = "widget-row-break";
+    rowBreak.setAttribute("aria-hidden", "true");
+    return rowBreak;
+  };
+
+  const applyWidgetSpacerSpan = (spacer, span) => {
+    const safeSpan = Math.max(1, Math.min(6, Number(span) || 1));
+    const displaySpan = Math.round(safeSpan);
+    spacer.dataset.widgetSpacerSpan = String(displaySpan);
+    spacer.style.gridColumn = `span ${displaySpan}`;
+  };
+
+  const createWidgetSpacer = (span = 3) => {
+    const spacer = document.createElement("div");
+    spacer.className = "widget-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    applyWidgetSpacerSpan(spacer, span);
+    return spacer;
+  };
+
   const cleanupPanelRowBreaks = (layout) => {
     [...layout.querySelectorAll(":scope > .db-panel-row-break")].forEach((rowBreak) => {
       const prev = rowBreak.previousElementSibling;
       const next = rowBreak.nextElementSibling;
       if (!prev || !next || next.classList.contains("db-panel-row-break")) rowBreak.remove();
+    });
+  };
+
+  const cleanupWidgetRowBreaks = (layout) => {
+    [...layout.querySelectorAll(":scope > .widget-row-break")].forEach((rowBreak) => {
+      const prev = rowBreak.previousElementSibling;
+      const next = rowBreak.nextElementSibling;
+      if (!prev || !next || next.classList.contains("widget-row-break")) rowBreak.remove();
+    });
+    [...layout.querySelectorAll(":scope > .widget-spacer")].forEach((spacer) => {
+      const next = spacer.nextElementSibling;
+      const prev = spacer.previousElementSibling;
+      if (!next || next.classList.contains("widget-row-break") || !prev?.classList.contains("widget-row-break") && !prev?.classList.contains("widget-spacer")) {
+        spacer.remove();
+      }
+    });
+    [...layout.querySelectorAll(":scope > .widget-row-break")].forEach((rowBreak) => {
+      const prev = rowBreak.previousElementSibling;
+      const next = rowBreak.nextElementSibling;
+      if (!prev || !next || next.classList.contains("widget-row-break")) rowBreak.remove();
     });
   };
 
@@ -835,12 +1159,16 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const animatePanelReflow = (layout, update, excludeItem = null) => {
-    const items = [...layout.querySelectorAll(":scope > .db-panel, :scope > .db-panel-placeholder")]
-      .filter((item) => item !== excludeItem && !item.classList.contains("db-panel-dragging"));
+    const host = gridHostForLayout(layout);
+    const selector = host !== layout
+      ? ".panel-layout > .db-panel, .panel-layout > .db-panel-placeholder, .widget-layout > .widget-card, .widget-layout > .widget-placeholder"
+      : ":scope > .db-panel, :scope > .db-panel-placeholder";
+    const items = [...host.querySelectorAll(selector)]
+      .filter((item) => item !== excludeItem && !item.classList.contains("db-panel-dragging") && !item.classList.contains("widget-dragging"));
     const before = new Map(items.map((item) => [item, item.getBoundingClientRect()]));
     update();
-    const afterItems = [...layout.querySelectorAll(":scope > .db-panel, :scope > .db-panel-placeholder")]
-      .filter((item) => item !== excludeItem && !item.classList.contains("db-panel-dragging"));
+    const afterItems = [...host.querySelectorAll(selector)]
+      .filter((item) => item !== excludeItem && !item.classList.contains("db-panel-dragging") && !item.classList.contains("widget-dragging"));
     afterItems.forEach((item) => {
       const first = before.get(item);
       if (!first) return;
@@ -861,12 +1189,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
   const animateWidgetReflow = (layout, update, excludeItem = null) => {
-    const items = [...layout.querySelectorAll(":scope > .widget-card, :scope > .widget-placeholder")]
-      .filter((item) => item !== excludeItem && !item.classList.contains("widget-dragging"));
+    const host = gridHostForLayout(layout);
+    const selector = host !== layout
+      ? ".widget-layout > .widget-card, .widget-layout > .widget-placeholder, .widget-layout > .widget-spacer, .panel-layout > .db-panel, .panel-layout > .db-panel-placeholder"
+      : ":scope > .widget-card, :scope > .widget-placeholder, :scope > .widget-spacer";
+    const items = [...host.querySelectorAll(selector)]
+      .filter((item) => item !== excludeItem && !item.classList.contains("widget-dragging") && !item.classList.contains("db-panel-dragging"));
     const before = new Map(items.map((item) => [item, item.getBoundingClientRect()]));
     update();
-    const afterItems = [...layout.querySelectorAll(":scope > .widget-card, :scope > .widget-placeholder")]
-      .filter((item) => item !== excludeItem && !item.classList.contains("widget-dragging"));
+    const afterItems = [...host.querySelectorAll(selector)]
+      .filter((item) => item !== excludeItem && !item.classList.contains("widget-dragging") && !item.classList.contains("db-panel-dragging"));
     afterItems.forEach((item) => {
       const first = before.get(item);
       if (!first) return;
@@ -920,11 +1252,338 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const applyWidgetSpan = (widget, span) => {
-    const safeSpan = Math.max(2, Math.min(12, Number(span) || Number(widget.dataset.defaultSpan) || 3));
-    const displaySpan = Number(safeSpan.toFixed(3));
+    const rawSpan = Number(span) || Number(widget.dataset.defaultSpan) || 1;
+    const safeSpan = Math.max(1, Math.min(6, rawSpan > 6 ? rawSpan / 2 : rawSpan));
+    const displaySpan = Math.round(safeSpan);
     widget.dataset.currentSpan = String(displaySpan);
-    const gap = 12;
-    widget.style.flexBasis = `calc(((100% - ${gap * 11}px) / 12 * ${displaySpan}) + ${Math.max(0, displaySpan - 1) * gap}px)`;
+    if (widget.dataset.gridCol && widget.dataset.gridRow) {
+      const currentCol = Number(widget.dataset.gridCol) || 1;
+      const currentRow = Number(widget.dataset.gridRow) || 1;
+      const safeCol = Math.max(1, Math.min(7 - displaySpan, currentCol));
+      widget.dataset.gridCol = String(safeCol);
+      widget.dataset.gridRow = String(Math.max(1, currentRow));
+      widget.dataset.gridRowSpan = "1";
+      widget.style.gridColumn = `${safeCol} / span ${displaySpan}`;
+      widget.style.gridRow = `${widget.dataset.gridRow} / span 1`;
+    } else {
+      widget.style.gridColumn = `span ${displaySpan}`;
+      widget.style.removeProperty("grid-row");
+    }
+    widget.style.removeProperty("width");
+    widget.style.removeProperty("flex-basis");
+  };
+
+  const applyWidgetGridPosition = (widget, col, row) => {
+    const span = Number(widget.dataset.currentSpan) || Number(widget.dataset.defaultSpan) || 1;
+    const safeSpan = Math.max(1, Math.min(6, span > 6 ? span / 2 : span));
+    const safeCol = Math.max(1, Math.min(7 - safeSpan, Math.round(Number(col) || 1)));
+    const safeRow = Math.max(1, Math.round(Number(row) || 1));
+    widget.dataset.gridCol = String(safeCol);
+    widget.dataset.gridRow = String(safeRow);
+    widget.dataset.gridRowSpan = "1";
+    widget.style.gridColumn = `${safeCol} / span ${Math.round(safeSpan)}`;
+    widget.style.gridRow = `${safeRow} / span 1`;
+  };
+
+  const widgetGridCellFromPoint = (layout, widget, clientX, clientY) => gridCellFromPoint(layout, widget, clientX, clientY);
+
+  const gridItemSpan = (item) => {
+    const rawSpan = Number(item.dataset.currentSpan) || Number(item.dataset.defaultSpan) || 1;
+    return Math.max(1, Math.min(6, Math.round(rawSpan > 6 ? rawSpan / 2 : rawSpan)));
+  };
+
+  const applyGridItemPosition = (item, col, row) => {
+    if (isWidgetGridItem(item)) {
+      applyWidgetGridPosition(item, col, row);
+    } else {
+      applyPanelGridPosition(item, col, row);
+    }
+  };
+
+  const snapshotGridLayout = (layout) => new Map(
+    [...gridHostForLayout(layout).querySelectorAll(".widget-layout > .widget-card, .panel-layout > .db-panel")]
+      .map((item) => [item, {
+        gridCol: item.dataset.gridCol,
+        gridRow: item.dataset.gridRow,
+        gridRowSpan: item.dataset.gridRowSpan,
+        gridColumnStyle: item.style.gridColumn,
+        gridRowStyle: item.style.gridRow,
+      }])
+  );
+
+  const restoreGridLayoutSnapshot = (snapshot) => {
+    snapshot?.forEach((state, item) => {
+      if (!item.isConnected) return;
+      if (state.gridCol === undefined) {
+        delete item.dataset.gridCol;
+      } else {
+        item.dataset.gridCol = state.gridCol;
+      }
+      if (state.gridRow === undefined) {
+        delete item.dataset.gridRow;
+      } else {
+        item.dataset.gridRow = state.gridRow;
+      }
+      if (state.gridRowSpan === undefined) {
+        delete item.dataset.gridRowSpan;
+      } else {
+        item.dataset.gridRowSpan = state.gridRowSpan;
+      }
+      item.style.gridColumn = state.gridColumnStyle || "";
+      item.style.gridRow = state.gridRowStyle || "";
+    });
+  };
+
+  const gridBoundsForItem = (item) => {
+    const col = Math.max(1, Math.round(Number(item.dataset.gridCol) || 1));
+    const row = Math.max(1, Math.round(Number(item.dataset.gridRow) || 1));
+    const span = gridItemSpan(item);
+    const rowSpan = gridItemRowSpan(item);
+    return {
+      col,
+      row,
+      span,
+      rowSpan,
+      right: col + span - 1,
+      bottom: row + rowSpan - 1,
+    };
+  };
+
+  const gridBoundsOverlap = (a, b) => (
+    a.col <= b.right &&
+    a.right >= b.col &&
+    a.row <= b.bottom &&
+    a.bottom >= b.row
+  );
+
+  const nextGridSlot = (bounds) => {
+    if (bounds.col < 7 - bounds.span) {
+      return { col: bounds.col + 1, row: bounds.row };
+    }
+    return { col: 1, row: bounds.row + 1 };
+  };
+
+  const localCollisionItems = (layout) => {
+    const host = gridHostForLayout(layout);
+    const selector = host !== layout
+      ? ".widget-layout > .widget-card:not([hidden]), .widget-layout > .widget-placeholder, .panel-layout > .db-panel:not([hidden]), .panel-layout > .db-panel-placeholder"
+      : layout.classList.contains("widget-layout")
+        ? ":scope > .widget-card:not([hidden]), :scope > .widget-placeholder"
+        : ":scope > .db-panel:not([hidden]), :scope > .db-panel-placeholder";
+    return [...host.querySelectorAll(selector)]
+      .filter((item) => !item.classList.contains("widget-dragging") && !item.classList.contains("db-panel-dragging"));
+  };
+
+  const applyLocalCollisionLayout = (layout, activeItems, options = {}) => {
+    const activeSet = new Set([].concat(activeItems || []).filter(Boolean));
+    if (!activeSet.size) return;
+    const origin = options.origin || null;
+    const target = options.target || null;
+    const items = localCollisionItems(layout);
+    const occupied = new Set();
+    const sortedItems = items
+      .filter((item) => !activeSet.has(item))
+      .map((item) => ({ item, bounds: gridBoundsForItem(item) }))
+      .sort((a, b) => (
+        a.bounds.row - b.bounds.row ||
+        a.bounds.col - b.bounds.col ||
+        [...gridHostForLayout(layout).querySelectorAll(".widget-card, .db-panel, .widget-placeholder, .db-panel-placeholder")].indexOf(a.item) -
+          [...gridHostForLayout(layout).querySelectorAll(".widget-card, .db-panel, .widget-placeholder, .db-panel-placeholder")].indexOf(b.item)
+      ));
+    const occupy = (bounds) => {
+      for (let row = bounds.row; row <= bounds.bottom; row += 1) {
+        for (let col = bounds.col; col <= bounds.right; col += 1) {
+          occupied.add(`${row}:${col}`);
+        }
+      }
+    };
+    const canOccupy = (bounds) => {
+      if (bounds.col < 1 || bounds.right > DASHBOARD_GRID_COLUMNS) return false;
+      for (let row = bounds.row; row <= bounds.bottom; row += 1) {
+        for (let col = bounds.col; col <= bounds.right; col += 1) {
+          if (occupied.has(`${row}:${col}`)) return false;
+        }
+      }
+      return true;
+    };
+    const boundsAt = (bounds, col, row) => ({
+      ...bounds,
+      col,
+      row,
+      right: col + bounds.span - 1,
+      bottom: row + bounds.rowSpan - 1,
+    });
+
+    [...activeSet].map(gridBoundsForItem).forEach(occupy);
+
+    if (options.protectBeforeOrigin && origin) {
+      const protectedItems = sortedItems.filter(({ bounds }) => (
+        bounds.row < origin.row ||
+        (bounds.row === origin.row && bounds.col < origin.col)
+      ));
+      protectedItems.forEach(({ bounds }) => occupy(bounds));
+      protectedItems.forEach((entry) => sortedItems.splice(sortedItems.indexOf(entry), 1));
+    }
+
+    const activeBounds = [...activeSet].map(gridBoundsForItem);
+    const primaryActive = [...activeSet][0];
+    const movingUp = Boolean(origin && target && target.row < origin.row && primaryActive);
+    const originBounds = movingUp ? boundsAt(gridBoundsForItem(primaryActive), origin.col, origin.row) : null;
+    const swapCandidate = originBounds
+      ? sortedItems.find(({ bounds }) => activeBounds.some((active) => gridBoundsOverlap(bounds, active)))
+      : null;
+
+    if (swapCandidate && canOccupy(originBounds)) {
+      applyGridItemPosition(swapCandidate.item, originBounds.col, originBounds.row);
+      occupy(originBounds);
+      sortedItems.splice(sortedItems.indexOf(swapCandidate), 1);
+    }
+
+    sortedItems.forEach(({ item, bounds }) => {
+      if (canOccupy(bounds)) {
+        occupy(bounds);
+        return;
+      }
+      let next = nextGridSlot(bounds);
+      for (let attempts = 0; attempts < 120; attempts += 1) {
+        const nextBounds = boundsAt(bounds, next.col, next.row);
+        if (canOccupy(nextBounds)) {
+          applyGridItemPosition(item, next.col, next.row);
+          occupy(nextBounds);
+          return;
+        }
+        next = nextGridSlot(nextBounds);
+      }
+    });
+  };
+
+  const syncDefaultDashboardGrid = (layoutKey) => {
+    const widgetLayout = document.querySelector(`.widget-layout[data-widget-layout-key="${CSS.escape(layoutKey)}"]`);
+    const panelLayout = document.querySelector(`.panel-layout[data-layout-key="${CSS.escape(layoutKey)}"]`);
+    if (!widgetLayout || !panelLayout || !widgetLayout.closest(".dashboard-layout-grid")) return;
+
+    let col = 1;
+    let row = 1;
+    [...widgetLayout.querySelectorAll(":scope > .widget-card:not([hidden])")].forEach((widget) => {
+      const span = gridItemSpan(widget);
+      if (col + span - 1 > DASHBOARD_GRID_COLUMNS) {
+        row += 1;
+        col = 1;
+      }
+      applyWidgetGridPosition(widget, col, row);
+      col += span;
+    });
+
+    const panelStartRow = Math.max(3, row + 1);
+    let panelCol = 1;
+    let panelRow = panelStartRow;
+    [...panelLayout.querySelectorAll(":scope > .db-panel:not([hidden])")].forEach((panel) => {
+      const span = gridItemSpan(panel);
+      if (panelCol + span - 1 > DASHBOARD_GRID_COLUMNS) {
+        panelRow += 1;
+        panelCol = 1;
+      }
+      applyPanelGridPosition(panel, panelCol, panelRow);
+      panelCol += span;
+    });
+  };
+
+  const normalizeGridLayout = (layout, priorityItem = null) => {
+    const host = gridHostForLayout(layout);
+    const selector = host !== layout
+      ? ".widget-layout > .widget-card:not([hidden]), .widget-layout > .widget-placeholder, .panel-layout > .db-panel:not([hidden]), .panel-layout > .db-panel-placeholder"
+      : layout.classList.contains("widget-layout")
+        ? ":scope > .widget-card:not([hidden]), :scope > .widget-placeholder"
+        : ":scope > .db-panel:not([hidden]), :scope > .db-panel-placeholder";
+    const items = [...host.querySelectorAll(selector)]
+      .filter((item) => !item.classList.contains("widget-dragging") && !item.classList.contains("db-panel-dragging"));
+    const occupied = new Set();
+    const orderedItems = items.sort((a, b) => {
+      if (a === priorityItem) return -1;
+      if (b === priorityItem) return 1;
+      const rowDelta = (Number(a.dataset.gridRow) || 1) - (Number(b.dataset.gridRow) || 1);
+      if (rowDelta) return rowDelta;
+      const colDelta = (Number(a.dataset.gridCol) || 1) - (Number(b.dataset.gridCol) || 1);
+      if (colDelta) return colDelta;
+      return [...host.querySelectorAll(".widget-card, .db-panel, .widget-placeholder, .db-panel-placeholder")].indexOf(a) -
+        [...host.querySelectorAll(".widget-card, .db-panel, .widget-placeholder, .db-panel-placeholder")].indexOf(b);
+    });
+    const canOccupy = (row, col, span, rowSpan) => {
+      if (col < 1 || col + span - 1 > DASHBOARD_GRID_COLUMNS) return false;
+      for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
+        for (let colOffset = 0; colOffset < span; colOffset += 1) {
+          if (occupied.has(`${row + rowOffset}:${col + colOffset}`)) return false;
+        }
+      }
+      return true;
+    };
+    const occupy = (row, col, span, rowSpan) => {
+      for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
+        for (let colOffset = 0; colOffset < span; colOffset += 1) {
+          occupied.add(`${row + rowOffset}:${col + colOffset}`);
+        }
+      }
+    };
+    orderedItems.forEach((item) => {
+      const span = gridItemSpan(item);
+      const rowSpan = gridItemRowSpan(item);
+      const preferredCol = Math.max(1, Math.min(7 - span, Number(item.dataset.gridCol) || 1));
+      const preferredRow = Math.max(1, Math.round(Number(item.dataset.gridRow) || 1));
+      let nextCol = preferredCol;
+      let nextRow = preferredRow;
+      let placed = false;
+      for (let row = preferredRow; row < preferredRow + 80 && !placed; row += 1) {
+        const startCol = row === preferredRow ? preferredCol : 1;
+        for (let col = startCol; col <= 7 - span; col += 1) {
+          if (!canOccupy(row, col, span, rowSpan)) continue;
+          nextCol = col;
+          nextRow = row;
+          placed = true;
+          break;
+        }
+      }
+      applyGridItemPosition(item, nextCol, nextRow);
+      occupy(nextRow, nextCol, span, rowSpan);
+    });
+  };
+
+  const widgetSpacerSiblingsBefore = (widget) => {
+    const spacers = [];
+    let cursor = widget.previousElementSibling;
+    while (cursor?.classList?.contains("widget-spacer")) {
+      spacers.unshift(cursor);
+      cursor = cursor.previousElementSibling;
+    }
+    return spacers;
+  };
+
+  const widgetHasRowBreakBefore = (widget) => {
+    let cursor = widget.previousElementSibling;
+    while (cursor?.classList?.contains("widget-spacer")) cursor = cursor.previousElementSibling;
+    return Boolean(cursor?.classList?.contains("widget-row-break"));
+  };
+
+  const alignedResizeHeight = ({ layout, item, currentHeight }) => {
+    const rect = item.getBoundingClientRect();
+    const layoutRect = gridRectForLayout(layout);
+    const tolerance = 18;
+    const candidates = [{ edge: layoutRect.bottom, priority: 1 }];
+    document.querySelectorAll(".widget-layout > .widget-card:not([hidden]), .panel-layout > .db-panel:not([hidden])").forEach((target) => {
+      if (target === item) return;
+      const targetRect = target.getBoundingClientRect();
+      candidates.push({ edge: targetRect.bottom, priority: 2 });
+      candidates.push({ edge: targetRect.top, priority: 3 });
+    });
+    const match = candidates
+      .map((candidate) => ({
+        ...candidate,
+        distance: Math.abs(rect.bottom - candidate.edge),
+      }))
+      .filter((candidate) => candidate.distance <= tolerance && candidate.edge > rect.top + 40)
+      .sort((a, b) => a.distance - b.distance || a.priority - b.priority)[0];
+    const gap = gridGapForLayout(layout);
+    const nextHeight = match ? Math.max(getPanelMinimumHeight(item), Math.round(match.edge - rect.top)) : currentHeight;
+    return gridHeightForRows(gridRowsFromHeight(nextHeight, gap, panelMinimumRows(item)), gap);
   };
 
   const saveWidgetLayouts = (layout, profile = getActivePanelProfile(layout.dataset.widgetLayoutKey || "default"), options = {}) => {
@@ -942,9 +1601,13 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem(widgetStorageKey(layoutKey, key, profile), JSON.stringify({
           order: index,
           span: Number(widget.dataset.currentSpan) || Number(widget.dataset.defaultSpan) || 3,
+          gridCol: Number(widget.dataset.gridCol) || null,
+          gridRow: Number(widget.dataset.gridRow) || null,
           color: widget.dataset.panelColor || null,
           title: widget.dataset.panelTitle || null,
           pinned: widget.classList.contains("db-panel-pinned"),
+          breakBefore: widgetHasRowBreakBefore(widget),
+          spacerBefore: widgetSpacerSiblingsBefore(widget).length,
         }));
       } catch {}
     });
@@ -955,6 +1618,8 @@ document.addEventListener("DOMContentLoaded", () => {
         value: widget.querySelector(".stat-val")?.textContent?.trim() || "0",
         color: widget.dataset.panelColor || widget.querySelector(".panel-color-toggle")?.dataset.defaultTheme || "#2563eb",
         span: Number(widget.dataset.currentSpan) || 3,
+        gridCol: Number(widget.dataset.gridCol) || null,
+        gridRow: Number(widget.dataset.gridRow) || null,
         type: widget.dataset.widgetType || "tracker",
         href: widget.getAttribute("href") || "",
       }));
@@ -999,7 +1664,9 @@ document.addEventListener("DOMContentLoaded", () => {
         saved = JSON.parse(localStorage.getItem(widgetStorageKey(layoutKey, key, profile)) || "null");
       } catch {}
       savedByWidget.set(widget, saved);
-      applyWidgetSpan(widget, saved?.span ?? widget.dataset.defaultSpan ?? 3);
+      const defaultWidgetSpan = widget.dataset.widgetType === "controls" ? 6 : 1;
+      applyWidgetSpan(widget, saved?.span ?? widget.dataset.defaultSpan ?? defaultWidgetSpan);
+      if (saved?.gridCol && saved?.gridRow) applyWidgetGridPosition(widget, saved.gridCol, saved.gridRow);
       widget.classList.toggle("db-panel-pinned", Boolean(saved?.pinned));
       applyPanelColor(widget, saved?.color || widget.querySelector(".panel-color-toggle")?.dataset.defaultTheme);
       applyPanelTitleColor(widget, "");
@@ -1011,7 +1678,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     widgets
       .sort((a, b) => Number(savedByWidget.get(a)?.order ?? a.dataset.defaultOrder ?? 0) - Number(savedByWidget.get(b)?.order ?? b.dataset.defaultOrder ?? 0))
-      .forEach((widget) => layout.appendChild(widget));
+      .forEach((widget) => {
+        if (savedByWidget.get(widget)?.breakBefore) layout.appendChild(createWidgetRowBreak());
+        const spacerCount = Math.max(0, Math.min(11, Number(savedByWidget.get(widget)?.spacerBefore) || 0));
+        for (let index = 0; index < spacerCount; index += 1) {
+          layout.appendChild(createWidgetSpacer(savedByWidget.get(widget)?.span || widget.dataset.defaultSpan || 3));
+        }
+        layout.appendChild(widget);
+      });
+    cleanupWidgetRowBreaks(layout);
+    let defaultCol = 1;
+    let defaultRow = 1;
+    [...layout.querySelectorAll(":scope > .widget-card")].forEach((widget) => {
+      if (widget.dataset.gridCol && widget.dataset.gridRow) return;
+      if (layout.closest(".dashboard-layout-grid")) return;
+      const span = Number(widget.dataset.currentSpan) || Number(widget.dataset.defaultSpan) || 1;
+      if (defaultCol + span - 1 > 6) {
+        defaultRow += 1;
+        defaultCol = 1;
+      }
+      applyWidgetGridPosition(widget, defaultCol, defaultRow);
+      defaultCol += span;
+    });
+    if (layout.closest(".dashboard-layout-grid")) {
+      syncDefaultDashboardGrid(layoutKey);
+    } else {
+      normalizeGridLayout(layout);
+    }
 
     const initWidget = (widget) => {
       if (widget.dataset.widgetInitialized === "true") return;
@@ -1133,6 +1826,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           groupSelection.delete(target);
           target.classList.remove("group-selected");
+          groupSelectedIds.delete(groupItemId(target));
           if (target.dataset.customWidget) {
             target.remove();
           } else {
@@ -1142,6 +1836,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (targets.some((target) => !target.dataset.customWidget)) {
           writeDraftList(layout, "hiddenWidgetsDraft", hidden);
         }
+        cleanupWidgetRowBreaks(layout);
         saveWidgetLayouts(layout);
       });
       moveHandle?.addEventListener("pointerdown", (event) => {
@@ -1157,47 +1852,28 @@ document.addEventListener("DOMContentLoaded", () => {
         let placeholder = null;
         let offsetX = 0;
         let offsetY = 0;
-        let lastPlaceholderMove = 0;
+        let lastGridCell = null;
+        let dragStartSnapshot = null;
         const startWidgets = [...layout.querySelectorAll(":scope > .widget-card")];
         const movePeers = groupPeers(widget, "widget")
           .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
           .sort((a, b) => startWidgets.indexOf(a) - startWidgets.indexOf(b));
-        const startIndex = startWidgets.indexOf(widget);
-        const pinnedBefore = startWidgets
-          .slice(0, Math.max(0, startIndex))
-          .filter((item) => item.classList.contains("db-panel-pinned"));
-        const previousPinned = pinnedBefore[pinnedBefore.length - 1] || null;
-        const nextPinned = startWidgets
-          .slice(Math.max(0, startIndex) + 1)
-          .find((item) => item.classList.contains("db-panel-pinned")) || null;
-
-        const childIndex = (item) => [...layout.children].indexOf(item);
-        const isInsidePinnedSegment = (item) => {
-          if (!item || item === widget) return false;
-          if (movePeers.includes(item)) return false;
-          if (item === placeholder) return true;
-          if (item.classList.contains("db-panel-pinned")) return false;
-          const itemIndex = childIndex(item);
-          if (itemIndex < 0) return false;
-          if (previousPinned && itemIndex <= childIndex(previousPinned)) return false;
-          if (nextPinned && itemIndex >= childIndex(nextPinned)) return false;
-          return true;
-        };
-        const clampDropBeforeNode = (beforeNode) => {
-          if (!beforeNode) return nextPinned?.parentNode === layout ? nextPinned : null;
-          const beforeIndex = childIndex(beforeNode);
-          if (beforeIndex < 0) return beforeNode;
-          if (previousPinned && beforeIndex <= childIndex(previousPinned)) return previousPinned.nextSibling;
-          if (nextPinned && beforeIndex >= childIndex(nextPinned)) return nextPinned;
-          return beforeNode;
-        };
+        const sourceStartCol = Number(widget.dataset.gridCol) || 1;
+        const sourceStartRow = Number(widget.dataset.gridRow) || 1;
+        const peerStartCells = new Map(movePeers.map((peer) => [peer, {
+          col: Number(peer.dataset.gridCol) || sourceStartCol,
+          row: Number(peer.dataset.gridRow) || sourceStartRow,
+        }]));
         const startDrag = () => {
           if (dragging) return;
           dragging = true;
           rect = widget.getBoundingClientRect();
+          dragStartSnapshot = snapshotGridLayout(layout);
           placeholder = document.createElement("div");
           placeholder.className = "widget-placeholder";
-          placeholder.style.flexBasis = widget.style.flexBasis;
+          placeholder.dataset.currentSpan = widget.dataset.currentSpan || widget.dataset.defaultSpan || "1";
+          placeholder.style.gridColumn = widget.style.gridColumn || `span ${widget.dataset.currentSpan || 1}`;
+          placeholder.style.gridRow = widget.style.gridRow || widget.dataset.gridRow || "1";
           placeholder.style.height = `${Math.max(72, rect.height)}px`;
           layout.insertBefore(placeholder, widget);
           widget.classList.add("widget-dragging");
@@ -1207,85 +1883,19 @@ document.addEventListener("DOMContentLoaded", () => {
           offsetX = startX - rect.left;
           offsetY = startY - rect.top;
         };
-        const orderedDropTargets = () => {
-          return [...layout.querySelectorAll(":scope > .widget-card, :scope > .widget-placeholder")]
-            .filter((item) => item !== widget)
-            .filter(isInsidePinnedSegment)
-            .sort((a, b) => {
-              const aRect = a.getBoundingClientRect();
-              const bRect = b.getBoundingClientRect();
-              if (Math.abs(aRect.top - bRect.top) > 12) return aRect.top - bRect.top;
-              return aRect.left - bRect.left;
-            });
-        };
-        const placePlaceholder = (beforeNode) => {
-          layout.insertBefore(placeholder, clampDropBeforeNode(beforeNode) || null);
-        };
         const updatePlaceholderPosition = (clientX, clientY) => {
           if (!placeholder) return;
-          const now = performance.now();
-          if (now - lastPlaceholderMove < 90) return;
-          const ordered = orderedDropTargets();
-          const targets = ordered.filter((item) => item !== placeholder);
-          if (!targets.length) {
-            animateWidgetReflow(layout, () => placePlaceholder(nextPinned || null));
-            lastPlaceholderMove = now;
-            return;
-          }
-          const layoutRect = layout.getBoundingClientRect();
-          const currentIndex = ordered
-            .slice(0, Math.max(0, ordered.indexOf(placeholder)))
-            .filter((item) => item !== placeholder).length;
-          let nextIndex = currentIndex;
-          if (clientY <= layoutRect.top) {
-            nextIndex = 0;
-          } else if (clientY >= layoutRect.bottom) {
-            nextIndex = targets.length;
-          } else {
-            let best = null;
-            let bestDistance = Number.POSITIVE_INFINITY;
-            targets.forEach((target) => {
-              const targetRect = target.getBoundingClientRect();
-              const centerX = targetRect.left + targetRect.width / 2;
-              const centerY = targetRect.top + targetRect.height / 2;
-              const dx = clientX - centerX;
-              const dy = clientY - centerY;
-              const distance = (dy * dy) + (dx * dx * 0.35);
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                best = target;
-              }
+          const cell = widgetGridCellFromPoint(layout, widget, clientX, clientY);
+          if (lastGridCell && lastGridCell.col === cell.col && lastGridCell.row === cell.row) return;
+          lastGridCell = cell;
+          animateWidgetReflow(layout, () => {
+            restoreGridLayoutSnapshot(dragStartSnapshot);
+            applyWidgetGridPosition(placeholder, cell.col, cell.row);
+            applyLocalCollisionLayout(layout, placeholder, {
+              origin: { col: sourceStartCol, row: sourceStartRow },
+              target: cell,
             });
-            if (!best) return;
-            const bestRect = best.getBoundingClientRect();
-            const sameRow = clientY >= bestRect.top && clientY <= bestRect.bottom;
-            const before = sameRow
-              ? clientX < bestRect.left + bestRect.width / 2
-              : clientY < bestRect.top + bestRect.height / 2;
-            nextIndex = targets.indexOf(best) + (before ? 0 : 1);
-          }
-
-          if (nextIndex === currentIndex) return;
-
-          const placeholderRect = placeholder.getBoundingClientRect();
-          const samePlaceholderRow = clientY >= placeholderRect.top - 18 && clientY <= placeholderRect.bottom + 18;
-          const switchPadding = 44;
-          if (samePlaceholderRow) {
-            if (nextIndex > currentIndex && clientX < placeholderRect.right + switchPadding) return;
-            if (nextIndex < currentIndex && clientX > placeholderRect.left - switchPadding) return;
-          } else {
-            if (nextIndex > currentIndex && clientY < placeholderRect.bottom + switchPadding) return;
-            if (nextIndex < currentIndex && clientY > placeholderRect.top - switchPadding) return;
-          }
-
-          if (nextIndex <= 0) {
-            animateWidgetReflow(layout, () => placePlaceholder(targets[0]));
-          } else if (nextIndex >= targets.length) {
-            animateWidgetReflow(layout, () => placePlaceholder(targets[targets.length - 1].nextSibling));
-          } else {
-            animateWidgetReflow(layout, () => placePlaceholder(targets[nextIndex]));
-          }
-          lastPlaceholderMove = now;
+          }, widget);
         };
         const onMove = (moveEvent) => {
           const dx = moveEvent.clientX - startX;
@@ -1300,20 +1910,39 @@ document.addEventListener("DOMContentLoaded", () => {
           const maxTop = Math.max(0, window.innerHeight - visibleEdge);
           widget.style.left = `${Math.round(Math.max(minLeft, Math.min(maxLeft, moveEvent.clientX - offsetX)))}px`;
           widget.style.top = `${Math.round(Math.max(minTop, Math.min(maxTop, moveEvent.clientY - offsetY)))}px`;
-          updatePlaceholderPosition(moveEvent.clientX, moveEvent.clientY);
+          const dragRect = widget.getBoundingClientRect();
+          updatePlaceholderPosition(dragRect.left + (dragRect.width / 2), dragRect.top + (dragRect.height / 2));
         };
-        const onUp = () => {
+        const onUp = (upEvent) => {
+          const canceled = upEvent?.type === "pointercancel";
           document.body.classList.remove("panel-interaction-active");
+          document.body.classList.remove("panel-resize-active");
           closeTools();
           if (dragging && placeholder) {
             widget.classList.remove("widget-dragging");
             widget.style.left = "";
             widget.style.top = "";
             widget.style.width = "";
-            layout.insertBefore(widget, placeholder);
-            movePeers.forEach((peer) => layout.insertBefore(peer, placeholder));
+            const nextCol = Number(placeholder.dataset.gridCol) || sourceStartCol;
+            const nextRow = Number(placeholder.dataset.gridRow) || sourceStartRow;
+            const returnedHome = nextCol === sourceStartCol && nextRow === sourceStartRow;
+            restoreGridLayoutSnapshot(dragStartSnapshot);
             placeholder.remove();
-            saveWidgetLayouts(layout);
+            if (!canceled && !returnedHome) {
+              const colDelta = nextCol - sourceStartCol;
+              const rowDelta = nextRow - sourceStartRow;
+              applyWidgetGridPosition(widget, nextCol, nextRow);
+              movePeers.forEach((peer) => {
+                const startCell = peerStartCells.get(peer) || { col: nextCol, row: nextRow };
+                applyWidgetGridPosition(peer, startCell.col + colDelta, startCell.row + rowDelta);
+              });
+              applyLocalCollisionLayout(layout, [widget, ...movePeers], {
+                origin: { col: sourceStartCol, row: sourceStartRow },
+                target: { col: nextCol, row: nextRow },
+              });
+              cleanupWidgetRowBreaks(layout);
+              saveSharedGridLayouts(layout);
+            }
           }
           dragging = false;
           document.removeEventListener("pointermove", onMove);
@@ -1330,20 +1959,33 @@ document.addEventListener("DOMContentLoaded", () => {
         event.stopPropagation();
         document.body.classList.add("panel-interaction-active");
         window.getSelection?.()?.removeAllRanges();
-        const layoutWidth = Math.max(1, layout.getBoundingClientRect().width);
-        const startSpan = Number(widget.dataset.currentSpan) || 3;
+        const layoutWidth = Math.max(1, gridRectForLayout(layout).width);
+        const startSpan = Number(widget.dataset.currentSpan) || 1;
         const resizePeers = groupPeers(widget, "widget")
           .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
-          .map((peer) => ({ peer, startSpan: Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 3 }));
+          .map((peer) => ({ peer, startSpan: Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 1 }));
+        const groupResizeItems = [{ peer: widget, startSpan }, ...resizePeers];
         const startX = event.clientX;
+        const resizeStartSnapshot = snapshotGridLayout(layout);
+        const sourceStartCol = Number(widget.dataset.gridCol) || 1;
+        const sourceStartRow = Number(widget.dataset.gridRow) || 1;
         let lastAnimatedSpan = startSpan;
         const applyResize = (nextSpan) => {
-          const delta = nextSpan - startSpan;
-          applyWidgetSpan(widget, nextSpan);
+          const requestedDelta = nextSpan - startSpan;
+          const minDelta = Math.max(...groupResizeItems.map(({ startSpan }) => 1 - startSpan));
+          const maxDelta = Math.min(...groupResizeItems.map(({ startSpan }) => 6 - startSpan));
+          const delta = Math.max(minDelta, Math.min(maxDelta, requestedDelta));
+          restoreGridLayoutSnapshot(resizeStartSnapshot);
+          applyWidgetSpan(widget, startSpan + delta);
           resizePeers.forEach(({ peer, startSpan: peerStartSpan }) => applyWidgetSpan(peer, peerStartSpan + delta));
+          applyLocalCollisionLayout(layout, [widget, ...resizePeers], {
+            origin: { col: sourceStartCol, row: sourceStartRow },
+            target: { col: sourceStartCol, row: sourceStartRow },
+            protectBeforeOrigin: true,
+          });
         };
         const onMove = (moveEvent) => {
-          const nextSpan = Math.max(2, Math.min(12, startSpan + (((moveEvent.clientX - startX) / layoutWidth) * 12)));
+          const nextSpan = Math.max(1, Math.min(6, startSpan + (((moveEvent.clientX - startX) / layoutWidth) * 6)));
           if (Math.abs(nextSpan - lastAnimatedSpan) >= .35) {
             animateWidgetReflow(layout, () => applyResize(nextSpan), widget);
             lastAnimatedSpan = nextSpan;
@@ -1353,11 +1995,33 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         const onUp = () => {
           document.body.classList.remove("panel-interaction-active");
+          document.body.classList.remove("panel-resize-active");
+          document.body.classList.add("panel-resize-snapping");
           animateWidgetReflow(layout, () => {
-            applyWidgetSpan(widget, Math.round(Number(widget.dataset.currentSpan) || startSpan));
-            resizePeers.forEach(({ peer }) => applyWidgetSpan(peer, Math.round(Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 3)));
+            const currentSpan = Number(widget.dataset.currentSpan) || startSpan;
+            const groupedSpan = groupedWidgetReleaseSpan(currentSpan, resizePeers.length + 1);
+            const snappedSpan = groupedSpan ?? alignedResizeSpan({
+              layout,
+              item: widget,
+              currentSpan,
+              gap: 12,
+              minSpan: 1,
+            });
+            const requestedDelta = snappedSpan - startSpan;
+            const minDelta = Math.max(...groupResizeItems.map(({ startSpan }) => 1 - startSpan));
+            const maxDelta = Math.min(...groupResizeItems.map(({ startSpan }) => 6 - startSpan));
+            const delta = Math.max(minDelta, Math.min(maxDelta, requestedDelta));
+            restoreGridLayoutSnapshot(resizeStartSnapshot);
+            applyWidgetSpan(widget, startSpan + delta);
+            resizePeers.forEach(({ peer, startSpan: peerStartSpan }) => applyWidgetSpan(peer, peerStartSpan + delta));
+            applyLocalCollisionLayout(layout, [widget, ...resizePeers], {
+              origin: { col: sourceStartCol, row: sourceStartRow },
+              target: { col: sourceStartCol, row: sourceStartRow },
+              protectBeforeOrigin: true,
+            });
           }, widget);
-          saveWidgetLayouts(layout);
+          saveSharedGridLayouts(layout);
+          window.setTimeout(() => document.body.classList.remove("panel-resize-snapping"), 260);
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
           document.removeEventListener("pointercancel", onUp);
@@ -1409,7 +2073,8 @@ document.addEventListener("DOMContentLoaded", () => {
         saved = JSON.parse(localStorage.getItem(panelStorageKey(layoutKey, key, layoutProfile)) || "null");
       } catch {}
       savedByPanel.set(panel, saved);
-      applyPanelSpan(panel, saved?.span ?? panel.dataset.defaultSpan ?? 12);
+      applyPanelSpan(panel, saved?.span ?? panel.dataset.defaultSpan ?? 6);
+      if (saved?.gridCol && saved?.gridRow) applyPanelGridPosition(panel, saved.gridCol, saved.gridRow);
       panel.classList.remove("db-panel-unlocked", "db-panel-pinned");
       if (saved?.pinned) panel.classList.add("db-panel-pinned");
       if (saved?.height) applyPanelHeight(panel, saved.height);
@@ -1432,6 +2097,24 @@ document.addEventListener("DOMContentLoaded", () => {
         layout.appendChild(panel);
       });
     cleanupPanelRowBreaks(layout);
+    let defaultPanelCol = 1;
+    let defaultPanelRow = 1;
+    [...layout.querySelectorAll(":scope > .db-panel")].forEach((panel) => {
+      if (panel.dataset.gridCol && panel.dataset.gridRow) return;
+      if (layout.closest(".dashboard-layout-grid")) return;
+      const span = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 6;
+      if (defaultPanelCol + span - 1 > 6) {
+        defaultPanelRow += 1;
+        defaultPanelCol = 1;
+      }
+      applyPanelGridPosition(panel, defaultPanelCol, defaultPanelRow);
+      defaultPanelCol += span;
+    });
+    if (layout.closest(".dashboard-layout-grid")) {
+      syncDefaultDashboardGrid(layoutKey);
+    } else {
+      normalizeGridLayout(layout);
+    }
 
     const initPanel = (panel) => {
       if (panel.dataset.panelInitialized === "true") return;
@@ -1607,13 +2290,35 @@ document.addEventListener("DOMContentLoaded", () => {
           movedDuringPointer = false;
           return;
         }
+        const wasCollapsed = panel.classList.contains("db-panel-collapsed");
+        if (wasCollapsed) {
+          panel.__expandedLayoutSnapshot = snapshotGridLayout(layout);
+        }
         const collapsed = panel.classList.toggle("db-panel-collapsed");
         if (collapsed) {
           if (panel.style.height) panel.dataset.savedHeight = String(parseFloat(panel.style.height));
+          panel.dataset.gridRowSpan = "1";
           panel.style.height = "";
         } else if (panel.dataset.savedHeight) {
           applyPanelHeight(panel, panel.dataset.savedHeight);
+        } else {
+          panel.dataset.gridRowSpan = String(panelMinimumRows(panel));
         }
+        if (panel.dataset.gridCol && panel.dataset.gridRow) applyPanelGridPosition(panel, panel.dataset.gridCol, panel.dataset.gridRow);
+        animatePanelReflow(layout, () => {
+          if (collapsed) {
+            if (panel.__expandedLayoutSnapshot) {
+              restoreGridLayoutSnapshot(panel.__expandedLayoutSnapshot);
+              delete panel.__expandedLayoutSnapshot;
+              panel.classList.add("db-panel-collapsed");
+              panel.dataset.gridRowSpan = "1";
+              panel.style.height = "";
+              if (panel.dataset.gridCol && panel.dataset.gridRow) applyPanelGridPosition(panel, panel.dataset.gridCol, panel.dataset.gridRow);
+            }
+          } else {
+            applyLocalCollisionLayout(layout, panel);
+          }
+        }, panel);
         header.setAttribute("aria-expanded", (!collapsed).toString());
         savePanelLayouts(layout);
       };
@@ -1638,61 +2343,37 @@ document.addEventListener("DOMContentLoaded", () => {
         const startY = event.clientY;
         let rect = null;
         let placeholder = null;
-        let rowBreak = null;
-        let placeholderBreakActive = false;
         let offsetX = 0;
         let offsetY = 0;
         let dragged = false;
-        let lastPlaceholderMove = 0;
+        let lastGridCell = null;
+        let dragStartSnapshot = null;
         const startPanels = [...layout.querySelectorAll(":scope > .db-panel")];
         const movePeers = groupPeers(panel, "panel")
           .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
           .sort((a, b) => startPanels.indexOf(a) - startPanels.indexOf(b));
-        const startIndex = startPanels.indexOf(panel);
-        const pinnedBefore = startPanels
-          .slice(0, Math.max(0, startIndex))
-          .filter((item) => item.classList.contains("db-panel-pinned"));
-        const previousPinned = pinnedBefore[pinnedBefore.length - 1] || null;
-        const nextPinned = startPanels
-          .slice(Math.max(0, startIndex) + 1)
-          .find((item) => item.classList.contains("db-panel-pinned")) || null;
-
-        const childIndex = (item) => [...layout.children].indexOf(item);
-
-        const isInsidePinnedSegment = (item) => {
-          if (!item || item === panel) return false;
-          if (movePeers.includes(item)) return false;
-          if (item === placeholder) return true;
-          if (item.classList.contains("db-panel-pinned")) return false;
-          const itemIndex = childIndex(item);
-          if (itemIndex < 0) return false;
-          if (previousPinned && itemIndex <= childIndex(previousPinned)) return false;
-          if (nextPinned && itemIndex >= childIndex(nextPinned)) return false;
-          return true;
-        };
-
-        const clampDropBeforeNode = (beforeNode) => {
-          if (!beforeNode) return nextPinned?.parentNode === layout ? nextPinned : null;
-          const beforeIndex = childIndex(beforeNode);
-          if (beforeIndex < 0) return beforeNode;
-          if (previousPinned && beforeIndex <= childIndex(previousPinned)) return previousPinned.nextSibling;
-          if (nextPinned && beforeIndex >= childIndex(nextPinned)) return nextPinned;
-          return beforeNode;
-        };
+        const sourceStartCol = Number(panel.dataset.gridCol) || 1;
+        const sourceStartRow = Number(panel.dataset.gridRow) || 1;
+        const peerStartCells = new Map(movePeers.map((peer) => [peer, {
+          col: Number(peer.dataset.gridCol) || sourceStartCol,
+          row: Number(peer.dataset.gridRow) || sourceStartRow,
+        }]));
 
         const startDrag = () => {
           if (dragged) return;
           dragged = true;
           window.getSelection?.()?.removeAllRanges();
           rect = panel.getBoundingClientRect();
+          dragStartSnapshot = snapshotGridLayout(layout);
           placeholder = document.createElement("div");
           placeholder.className = "db-panel-placeholder";
-          placeholder.style.gridColumn = panel.style.gridColumn || `span ${panel.dataset.currentSpan || panel.dataset.defaultSpan || 12}`;
-          placeholder.style.setProperty("--panel-basis", panel.style.getPropertyValue("--panel-basis"));
-          placeholder.style.height = `${Math.max(72, rect.height)}px`;
-          if (panel.previousElementSibling?.classList.contains("db-panel-row-break")) {
-            panel.previousElementSibling.remove();
-          }
+          placeholder.dataset.currentSpan = panel.dataset.currentSpan || panel.dataset.defaultSpan || "6";
+          if (panel.classList.contains("db-panel-collapsed")) placeholder.dataset.gridRowSpan = "1";
+          placeholder.style.gridColumn = panel.style.gridColumn || `span ${panel.dataset.currentSpan || panel.dataset.defaultSpan || 6}`;
+          placeholder.style.gridRow = panel.style.gridRow || panel.dataset.gridRow || "1";
+          placeholder.style.height = panel.classList.contains("db-panel-collapsed")
+            ? `${DASHBOARD_GRID_ROW_HEIGHT}px`
+            : `${Math.max(DASHBOARD_GRID_ROW_HEIGHT, rect.height)}px`;
           layout.insertBefore(placeholder, panel);
           panel.classList.add("db-panel-dragging");
           panel.style.width = `${rect.width}px`;
@@ -1703,100 +2384,19 @@ document.addEventListener("DOMContentLoaded", () => {
           offsetY = startY - rect.top;
         };
 
-        const orderedDropTargets = () => {
-          return [...layout.querySelectorAll(":scope > .db-panel, :scope > .db-panel-placeholder")]
-            .filter((item) => item !== panel)
-            .filter(isInsidePinnedSegment)
-            .sort((a, b) => {
-              const aRect = a.getBoundingClientRect();
-              const bRect = b.getBoundingClientRect();
-              if (Math.abs(aRect.top - bRect.top) > 12) return aRect.top - bRect.top;
-              return aRect.left - bRect.left;
-            });
-        };
-
-        const placePlaceholder = (beforeNode, forceRowBreak) => {
-          const safeBeforeNode = clampDropBeforeNode(beforeNode);
-          if (forceRowBreak && !rowBreak) rowBreak = createPanelRowBreak();
-          if (forceRowBreak) {
-            layout.insertBefore(rowBreak, safeBeforeNode || null);
-            layout.insertBefore(placeholder, rowBreak.nextSibling);
-            placeholderBreakActive = true;
-          } else {
-            if (rowBreak?.parentNode) rowBreak.remove();
-            layout.insertBefore(placeholder, safeBeforeNode || null);
-            placeholderBreakActive = false;
-          }
-        };
-
         const updatePlaceholderPosition = (clientX, clientY) => {
           if (!placeholder) return;
-          const now = performance.now();
-          if (now - lastPlaceholderMove < 110) return;
-          const ordered = orderedDropTargets();
-          const targets = ordered.filter((item) => item !== placeholder);
-          if (!targets.length) {
-            animatePanelReflow(layout, () => placePlaceholder(nextPinned || null, false));
-            lastPlaceholderMove = now;
-            return;
-          }
-          const layoutRect = layout.getBoundingClientRect();
-          const currentIndex = ordered
-            .slice(0, Math.max(0, ordered.indexOf(placeholder)))
-            .filter((item) => item !== placeholder).length;
-          let nextIndex = currentIndex;
-          let forceRowBreak = false;
-          if (clientY <= layoutRect.top) {
-            nextIndex = 0;
-          } else if (clientY >= layoutRect.bottom) {
-            nextIndex = targets.length;
-            forceRowBreak = true;
-          } else {
-            let best = null;
-            let bestDistance = Number.POSITIVE_INFINITY;
-            targets.forEach((target) => {
-              const targetRect = target.getBoundingClientRect();
-              const centerX = targetRect.left + targetRect.width / 2;
-              const centerY = targetRect.top + targetRect.height / 2;
-              const dx = clientX - centerX;
-              const dy = clientY - centerY;
-              const distance = (dy * dy) + (dx * dx * 0.35);
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                best = target;
-              }
+          const cell = panelGridCellFromPoint(layout, panel, clientX, clientY);
+          if (lastGridCell && lastGridCell.col === cell.col && lastGridCell.row === cell.row) return;
+          lastGridCell = cell;
+          animatePanelReflow(layout, () => {
+            restoreGridLayoutSnapshot(dragStartSnapshot);
+            applyPanelGridPosition(placeholder, cell.col, cell.row);
+            applyLocalCollisionLayout(layout, placeholder, {
+              origin: { col: sourceStartCol, row: sourceStartRow },
+              target: cell,
             });
-            if (!best) return;
-            const bestRect = best.getBoundingClientRect();
-            const sameRow = clientY >= bestRect.top && clientY <= bestRect.bottom;
-            forceRowBreak = clientY > bestRect.bottom + 28;
-            const before = sameRow
-              ? clientX < bestRect.left + bestRect.width / 2
-              : clientY < bestRect.top + bestRect.height / 2;
-            nextIndex = targets.indexOf(best) + (before ? 0 : 1);
-          }
-
-          if (nextIndex === currentIndex && forceRowBreak === placeholderBreakActive) return;
-
-          const placeholderRect = placeholder.getBoundingClientRect();
-          const samePlaceholderRow = clientY >= placeholderRect.top - 20 && clientY <= placeholderRect.bottom + 20;
-          const switchPadding = 56;
-          if (samePlaceholderRow) {
-            if (nextIndex > currentIndex && clientX < placeholderRect.right + switchPadding) return;
-            if (nextIndex < currentIndex && clientX > placeholderRect.left - switchPadding) return;
-          } else {
-            if (nextIndex > currentIndex && clientY < placeholderRect.bottom + switchPadding) return;
-            if (nextIndex < currentIndex && clientY > placeholderRect.top - switchPadding) return;
-          }
-
-          if (nextIndex <= 0) {
-            animatePanelReflow(layout, () => placePlaceholder(targets[0], false));
-          } else if (nextIndex >= targets.length) {
-            animatePanelReflow(layout, () => placePlaceholder(targets[targets.length - 1].nextSibling, forceRowBreak));
-          } else {
-            animatePanelReflow(layout, () => placePlaceholder(targets[nextIndex], forceRowBreak));
-          }
-          lastPlaceholderMove = now;
+          }, panel);
         };
 
         const onPointerMove = (moveEvent) => {
@@ -1814,11 +2414,14 @@ document.addEventListener("DOMContentLoaded", () => {
           const nextTop = Math.max(minTop, Math.min(maxTop, moveEvent.clientY - offsetY));
           panel.style.left = `${Math.round(nextLeft)}px`;
           panel.style.top = `${Math.round(nextTop)}px`;
-          updatePlaceholderPosition(moveEvent.clientX, moveEvent.clientY);
+          const dragRect = panel.getBoundingClientRect();
+          updatePlaceholderPosition(dragRect.left + (dragRect.width / 2), dragRect.top + (dragRect.height / 2));
         };
 
-        const onPointerUp = () => {
+        const onPointerUp = (upEvent) => {
+          const canceled = upEvent?.type === "pointercancel";
           document.body.classList.remove("panel-interaction-active");
+          document.body.classList.remove("panel-resize-active");
           toolPointerCapture = false;
           closePanelTools();
           if (dragged && placeholder) {
@@ -1826,16 +2429,26 @@ document.addEventListener("DOMContentLoaded", () => {
             panel.style.left = "";
             panel.style.top = "";
             panel.style.width = "";
-            layout.insertBefore(panel, placeholder);
-            movePeers.forEach((peer) => {
-              if (peer.previousElementSibling?.classList.contains("db-panel-row-break")) {
-                peer.previousElementSibling.remove();
-              }
-              layout.insertBefore(peer, placeholder);
-            });
+            const nextCol = Number(placeholder.dataset.gridCol) || sourceStartCol;
+            const nextRow = Number(placeholder.dataset.gridRow) || sourceStartRow;
+            const returnedHome = nextCol === sourceStartCol && nextRow === sourceStartRow;
+            restoreGridLayoutSnapshot(dragStartSnapshot);
             placeholder.remove();
-            cleanupPanelRowBreaks(layout);
-            savePanelLayouts(layout);
+            if (!canceled && !returnedHome) {
+              const colDelta = nextCol - sourceStartCol;
+              const rowDelta = nextRow - sourceStartRow;
+              applyPanelGridPosition(panel, nextCol, nextRow);
+              movePeers.forEach((peer) => {
+                const startCell = peerStartCells.get(peer) || { col: nextCol, row: nextRow };
+                applyPanelGridPosition(peer, startCell.col + colDelta, startCell.row + rowDelta);
+              });
+              applyLocalCollisionLayout(layout, [panel, ...movePeers], {
+                origin: { col: sourceStartCol, row: sourceStartRow },
+                target: { col: nextCol, row: nextRow },
+              });
+              cleanupPanelRowBreaks(layout);
+              saveSharedGridLayouts(layout);
+            }
           }
           movedDuringPointer = dragged;
           window.setTimeout(() => {
@@ -1858,40 +2471,50 @@ document.addEventListener("DOMContentLoaded", () => {
         toolPointerCapture = true;
         openPanelTools();
         document.body.classList.add("panel-interaction-active");
+        document.body.classList.add("panel-resize-active");
         window.getSelection?.()?.removeAllRanges();
         const startX = event.clientX;
         const startY = event.clientY;
         const startRect = panel.getBoundingClientRect();
-        const layoutRect = layout.getBoundingClientRect();
+        const layoutRect = gridRectForLayout(layout);
         const layoutWidth = Math.max(1, layoutRect.width);
         const startWidthPct = (startRect.width / layoutWidth) * 100;
-        const minWidthPct = Math.min(100, (getPanelMinimumWidth(panel) / layoutWidth) * 100);
-        const startSpan = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12;
+        const startSpan = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 6;
         const resizePeers = groupPeers(panel, "panel")
           .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
-          .map((peer) => ({
-            peer,
-            startSpan: Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 12,
-            startHeight: peer.getBoundingClientRect().height,
-          }));
+          .map((peer) => ({ peer, startSpan: Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 6 }));
+        const groupResizeItems = [{ peer: panel, startSpan }, ...resizePeers];
+        const resizeStartSnapshot = snapshotGridLayout(layout);
+        const sourceStartCol = Number(panel.dataset.gridCol) || 1;
+        const sourceStartRow = Number(panel.dataset.gridRow) || 1;
         let lastAnimatedSpan = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12;
         let lastAnimatedHeight = startRect.height;
         const applyResize = (nextSpan, nextHeight) => {
-          const spanDelta = nextSpan - startSpan;
-          const heightDelta = nextHeight - startRect.height;
-          applyPanelSpan(panel, nextSpan);
+          const requestedDelta = nextSpan - startSpan;
+          const minDelta = Math.max(...groupResizeItems.map(({ startSpan }) => 1 - startSpan));
+          const maxDelta = Math.min(...groupResizeItems.map(({ startSpan }) => 6 - startSpan));
+          const delta = Math.max(minDelta, Math.min(maxDelta, requestedDelta));
+          restoreGridLayoutSnapshot(resizeStartSnapshot);
+          applyPanelSpan(panel, startSpan + delta);
           applyPanelHeight(panel, nextHeight);
-          resizePeers.forEach(({ peer, startSpan: peerStartSpan, startHeight }) => {
-            applyPanelSpan(peer, peerStartSpan + spanDelta);
-            applyPanelHeight(peer, Math.max(getPanelMinimumHeight(peer), Math.round(startHeight + heightDelta)));
+          resizePeers.forEach(({ peer, startSpan: peerStartSpan }) => {
+            applyPanelSpan(peer, peerStartSpan + delta);
+            applyPanelHeight(peer, Math.max(getPanelMinimumHeight(peer), nextHeight));
+          });
+          applyLocalCollisionLayout(layout, [panel, ...resizePeers], {
+            origin: { col: sourceStartCol, row: sourceStartRow },
+            target: { col: sourceStartCol, row: sourceStartRow },
+            protectBeforeOrigin: true,
           });
         };
 
         const onResizeMove = (moveEvent) => {
-          const nextWidthPct = Math.max(minWidthPct, Math.min(100, startWidthPct + (((moveEvent.clientX - startX) / layoutWidth) * 100)));
-          const nextSpan = (nextWidthPct / 100) * 12;
-          const nextHeight = Math.max(getPanelMinimumHeight(panel), Math.round(startRect.height + (moveEvent.clientY - startY)));
-          const normalizedSpan = Math.max(3, Math.min(12, nextSpan));
+          const nextWidthPct = Math.max(0, Math.min(100, startWidthPct + (((moveEvent.clientX - startX) / layoutWidth) * 100)));
+          const nextSpan = (nextWidthPct / 100) * 6;
+          const gap = gridGapForLayout(layout);
+          const nextRows = gridRowsFromHeight(startRect.height + (moveEvent.clientY - startY), gap, panelMinimumRows(panel));
+          const nextHeight = gridHeightForRows(nextRows, gap);
+          const normalizedSpan = Math.max(1, Math.min(6, nextSpan));
           const shouldAnimateReflow =
             Math.abs(normalizedSpan - lastAnimatedSpan) >= .35 ||
             Math.abs(nextHeight - lastAnimatedHeight) >= 24;
@@ -1908,13 +2531,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const onResizeEnd = () => {
           document.body.classList.remove("panel-interaction-active");
+          document.body.classList.remove("panel-resize-active");
           toolPointerCapture = false;
+          document.body.classList.add("panel-resize-snapping");
           animatePanelReflow(layout, () => {
-            applyPanelSpan(panel, Math.round(Number(panel.dataset.currentSpan) || lastAnimatedSpan));
-            resizePeers.forEach(({ peer }) => applyPanelSpan(peer, Math.round(Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 12)));
+            const currentSpan = Number(panel.dataset.currentSpan) || lastAnimatedSpan;
+            const groupedSpan = groupedPanelReleaseSpan(currentSpan, resizePeers.length + 1);
+            const snappedSpan = groupedSpan ?? alignedResizeSpan({
+              layout,
+              item: panel,
+              currentSpan,
+              gap: 16,
+              minSpan: 1,
+            });
+            const snappedHeight = alignedResizeHeight({
+              layout,
+              item: panel,
+              currentHeight: Number(panel.dataset.savedHeight) || panel.getBoundingClientRect().height,
+            });
+            const requestedDelta = snappedSpan - startSpan;
+            const minDelta = Math.max(...groupResizeItems.map(({ startSpan }) => 1 - startSpan));
+            const maxDelta = Math.min(...groupResizeItems.map(({ startSpan }) => 6 - startSpan));
+            const delta = Math.max(minDelta, Math.min(maxDelta, requestedDelta));
+            restoreGridLayoutSnapshot(resizeStartSnapshot);
+            applyPanelSpan(panel, startSpan + delta);
+            applyPanelHeight(panel, snappedHeight);
+            resizePeers.forEach(({ peer, startSpan: peerStartSpan }) => {
+              applyPanelSpan(peer, peerStartSpan + delta);
+              applyPanelHeight(peer, Math.max(getPanelMinimumHeight(peer), snappedHeight));
+            });
+            applyLocalCollisionLayout(layout, [panel, ...resizePeers], {
+              origin: { col: sourceStartCol, row: sourceStartRow },
+              target: { col: sourceStartCol, row: sourceStartRow },
+              protectBeforeOrigin: true,
+            });
           }, panel);
           closePanelTools();
-          savePanelLayouts(layout);
+          saveSharedGridLayouts(layout);
+          window.setTimeout(() => document.body.classList.remove("panel-resize-snapping"), 260);
           document.removeEventListener("pointermove", onResizeMove);
           document.removeEventListener("pointerup", onResizeEnd);
           document.removeEventListener("pointercancel", onResizeEnd);
@@ -2027,6 +2681,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (element) element.replaceWith(nextElement);
     });
 
+    restoreGroupSelection();
     scheduleOverflowTitles();
   };
 
@@ -2182,37 +2837,6 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleGroupItem(item);
   }, true);
 
-  document.querySelectorAll(".layout-normalize-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      const layoutKey = button.dataset.layoutTarget || "default";
-      const widgets = selectedGroupItems("widget", layoutKey);
-      const panels = selectedGroupItems("panel", layoutKey);
-      if (widgets.length < 2 && panels.length < 2) {
-        showToast("Select at least two widgets or two panels in Group mode first.", "warn");
-        return;
-      }
-      const widgetLayout = document.querySelector(`.widget-layout[data-widget-layout-key="${CSS.escape(layoutKey)}"]`);
-      const panelLayout = document.querySelector(`.panel-layout[data-layout-key="${CSS.escape(layoutKey)}"]`);
-      if (widgets.length > 1 && widgetLayout) {
-        const span = Math.round(Number(widgets[0].dataset.currentSpan) || Number(widgets[0].dataset.defaultSpan) || 3);
-        animateWidgetReflow(widgetLayout, () => widgets.forEach((widget) => applyWidgetSpan(widget, span)));
-        saveWidgetLayouts(widgetLayout);
-      }
-      if (panels.length > 1 && panelLayout) {
-        const span = Math.round(Number(panels[0].dataset.currentSpan) || Number(panels[0].dataset.defaultSpan) || 12);
-        const height = Number(panels[0].dataset.savedHeight) || panels[0].getBoundingClientRect().height;
-        animatePanelReflow(panelLayout, () => {
-          panels.forEach((panel) => {
-            applyPanelSpan(panel, span);
-            applyPanelHeight(panel, height);
-          });
-        });
-        savePanelLayouts(panelLayout);
-      }
-      showToast("Selected group size normalized.");
-    });
-  });
-
   document.querySelectorAll(".panel-add-picker").forEach((picker) => {
     const trigger = picker.querySelector(".panel-add-button");
     const menu = picker.querySelector(".panel-add-menu");
@@ -2260,11 +2884,11 @@ document.addEventListener("DOMContentLoaded", () => {
         panelThemePresets[customCount % panelThemePresets.length];
       const key = `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       const title = `Panel ${customCount + 1}`;
-      const definition = { key, title, color: nextColor, span: 4 };
+      const definition = { key, title, color: nextColor, span: 1 };
       const order = [...layout.querySelectorAll(":scope > .db-panel")].length;
       const panel = createCustomPanel(definition);
       panel.dataset.defaultOrder = String(order);
-      applyPanelSpan(panel, 4);
+      applyPanelSpan(panel, 1);
       applyPanelColor(panel, nextColor);
       applyPanelTitleColor(panel, "#ffffff");
       animatePanelReflow(layout, () => layout.appendChild(panel));
@@ -2293,10 +2917,10 @@ document.addEventListener("DOMContentLoaded", () => {
         panelThemePresets[customCount % panelThemePresets.length];
       const key = `widget-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       const title = `Widget ${customCount + 1}`;
-      const definition = { key, title, value: "0", color: nextColor, span: 3, type: "tracker" };
+      const definition = { key, title, value: "0", color: nextColor, span: 1, type: "tracker" };
       const widget = createCustomWidget(definition);
       ensureWidgetTools(widget, nextColor);
-      applyWidgetSpan(widget, 3);
+      applyWidgetSpan(widget, 1);
       applyPanelColor(widget, nextColor);
       applyPanelTitleColor(widget, "#ffffff");
       animateWidgetReflow(layout, () => layout.appendChild(widget));
@@ -2327,13 +2951,15 @@ document.addEventListener("DOMContentLoaded", () => {
       captureLayoutUndo(layoutKey, profile);
       widgetLayouts.forEach((layout) => {
         writeDraftList(layout, "hiddenWidgetsDraft", []);
+        layout.querySelectorAll(":scope > .widget-row-break").forEach((rowBreak) => rowBreak.remove());
+        layout.querySelectorAll(":scope > .widget-spacer").forEach((spacer) => spacer.remove());
         layout.querySelectorAll(':scope > .widget-card[data-custom-widget="true"]').forEach((widget) => widget.remove());
         [...layout.querySelectorAll(":scope > .widget-card")]
           .sort((a, b) => Number(a.dataset.defaultOrder || 0) - Number(b.dataset.defaultOrder || 0))
           .forEach((widget) => {
             widget.hidden = false;
             widget.classList.remove("db-panel-pinned", "widget-tools-open", "db-panel-custom-color", "db-panel-custom-title");
-            widget.style.flexBasis = "";
+            widget.style.gridColumn = "";
             delete widget.dataset.currentSpan;
             delete widget.dataset.panelColor;
             delete widget.dataset.panelTitleColor;
@@ -2373,7 +2999,7 @@ document.addEventListener("DOMContentLoaded", () => {
             panel.style.removeProperty("--panel-accent");
             panel.style.removeProperty("--panel-accent-rgb");
             panel.style.removeProperty("--panel-accent-text");
-            applyPanelSpan(panel, panel.dataset.defaultSpan || 12);
+            applyPanelSpan(panel, panel.dataset.defaultSpan || 6);
             const defaultTheme = panel.querySelector(".panel-color-toggle")?.dataset.defaultTheme;
             applyPanelColor(panel, defaultTheme);
             applyPanelTitleColor(panel, "#ffffff");
@@ -2386,6 +3012,9 @@ document.addEventListener("DOMContentLoaded", () => {
             pinButton?.setAttribute("aria-pressed", "false");
           });
       });
+      syncDefaultDashboardGrid(layoutKey);
+      widgetLayouts.filter((layout) => !layout.closest(".dashboard-layout-grid")).forEach((layout) => normalizeGridLayout(layout));
+      layouts.filter((layout) => !layout.closest(".dashboard-layout-grid")).forEach((layout) => normalizeGridLayout(layout));
       showToast("Layout reset to default.");
       pushLiveLayoutUndo(layoutKey, profile);
     });
