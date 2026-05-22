@@ -1763,10 +1763,10 @@ pre {
 }
 
 .range-bar.widget-card {
-  --range-control-bg: rgba(37, 99, 235, .12);
+  --range-control-bg: color-mix(in srgb, var(--surface-raised) 62%, var(--blue) 38%);
   --range-control-fg: var(--blue);
-  --range-control-border: rgba(37, 99, 235, .26);
-  --range-control-glow: rgba(37, 99, 235, .18);
+  --range-control-border: color-mix(in srgb, var(--blue) 54%, var(--panel-hover-tint));
+  --range-control-glow: rgba(37, 99, 235, .24);
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
