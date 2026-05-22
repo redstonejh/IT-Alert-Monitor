@@ -659,6 +659,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const gridItemRowSpan = (item) => {
     if (item.classList.contains("widget-card") || item.classList.contains("widget-placeholder")) return 1;
+    if (item.classList.contains("db-panel-collapsed")) return 1;
+    if (item.classList.contains("db-panel-placeholder") && Number(item.dataset.gridRowSpan) === 1) return 1;
     const layout = item.closest(".panel-layout");
     const gap = gridGapForLayout(layout);
     const measuredHeight = Number(item.dataset.savedHeight) || item.getBoundingClientRect().height || DASHBOARD_GRID_ROW_HEIGHT;
@@ -1331,6 +1333,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       item.style.gridColumn = state.gridColumnStyle || "";
       item.style.gridRow = state.gridRowStyle || "";
+      if (item.classList.contains("db-panel-collapsed") && item.dataset.gridCol && item.dataset.gridRow) {
+        item.dataset.gridRowSpan = "1";
+        applyPanelGridPosition(item, item.dataset.gridCol, item.dataset.gridRow);
+      }
     });
   };
 
