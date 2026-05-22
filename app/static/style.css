@@ -1763,6 +1763,10 @@ pre {
 }
 
 .range-bar.widget-card {
+  --range-control-bg: rgba(37, 99, 235, .12);
+  --range-control-fg: var(--blue);
+  --range-control-border: rgba(37, 99, 235, .26);
+  --range-control-glow: rgba(37, 99, 235, .18);
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
@@ -1858,10 +1862,11 @@ pre {
   width: 100%;
   height: 34px;
   padding: 0 14px 0 34px;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--range-control-border);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted-strong);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--range-control-fg) 12%);
+  color: var(--range-control-fg);
+  box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .15s ease;
 }
 
@@ -1895,7 +1900,7 @@ pre {
   top: 50%;
   width: 12px;
   height: 12px;
-  border: 2px solid var(--muted);
+  border: 2px solid var(--range-control-fg);
   border-radius: 999px;
   transform: translateY(-55%);
   pointer-events: none;
@@ -1910,22 +1915,22 @@ pre {
   width: 7px;
   height: 2px;
   border-radius: 999px;
-  background: var(--muted);
+  background: var(--range-control-fg);
   transform: rotate(45deg);
   pointer-events: none;
   z-index: 1;
 }
 
 .range-search:hover .range-search-input {
-  border-color: #b8c4d6;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, .10);
-  background: #fff;
+  border-color: currentColor;
+  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
+  background: color-mix(in srgb, var(--range-control-bg) 75%, var(--panel-hover-tint));
 }
 
 .range-search-input:focus {
   outline: none;
-  border-color: var(--blue);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, .10), 0 0 0 2px rgba(37, 99, 235, .10);
+  border-color: currentColor;
+  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 .range-search:focus-within::before {
@@ -1953,17 +1958,17 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
+  height: 34px;
   width: 72px;
-  min-height: 0;
+  min-height: 34px;
   padding: 0;
-  border: 1.5px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--muted-strong);
+  border: 1.5px solid var(--range-control-border);
+  border-radius: 999px;
+  background: var(--range-control-bg);
+  color: var(--range-control-fg);
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+  box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
   transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
   text-align: center;
   white-space: nowrap;
@@ -1972,19 +1977,19 @@ pre {
 
 .preset-btn:hover,
 .preset-btn.active {
-  background: #f7faff;
-  border-color: #8fb4f4;
-  color: #1d4ed8;
+  background: color-mix(in srgb, var(--range-control-bg) 75%, var(--panel-hover-tint));
+  border-color: currentColor;
+  color: var(--range-control-fg);
 }
 
 .preset-btn:hover {
-  box-shadow: 0 6px 16px rgba(37, 99, 235, .10);
+  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
   transform: translateY(-1px);
 }
 
 .preset-btn.active {
-  border-color: var(--blue);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .18), 0 2px 8px rgba(37, 99, 235, .10);
+  border-color: currentColor;
+  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .28);
 }
 
 .range-custom {
@@ -1998,7 +2003,7 @@ pre {
   box-shadow: none;
   transition: none;
   flex: 0 0 auto;
-  height: 28px;
+  height: 34px;
   min-height: 0;
   line-height: 0;
   position: relative;
@@ -2016,19 +2021,19 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
+  height: 34px;
   width: auto;
   min-width: 104px;
-  min-height: 0;
+  min-height: 34px;
   white-space: nowrap;
   padding: 0;
-  border: 1.5px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--muted-strong);
+  border: 1.5px solid var(--range-control-border);
+  border-radius: 999px;
+  background: var(--range-control-bg);
+  color: var(--range-control-fg);
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+  box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
   transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 
@@ -2036,18 +2041,18 @@ pre {
 .range-custom-trigger:focus-visible,
 .range-custom-trigger.active {
   outline: none;
-  border-color: var(--blue);
-  background: #f7faff;
-  color: #1d4ed8;
+  border-color: currentColor;
+  background: color-mix(in srgb, var(--range-control-bg) 75%, var(--panel-hover-tint));
+  color: var(--range-control-fg);
 }
 
 .range-custom-trigger:hover {
-  box-shadow: 0 6px 16px rgba(37, 99, 235, .10);
+  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 var(--panel-hover-inset);
   transform: translateY(-1px);
 }
 
 .range-custom-trigger.active {
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .18), 0 2px 8px rgba(37, 99, 235, .10);
+  box-shadow: 0 14px 28px var(--range-control-glow), 0 0 22px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .28);
 }
 
 .range-date-input {
@@ -2073,14 +2078,14 @@ pre {
 .range-display {
   display: inline-flex;
   align-items: center;
-  height: 28px;
-  padding: 0 10px;
-  border: 1.5px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--muted-strong);
+  height: 34px;
+  padding: 0 12px;
+  border: 1.5px solid var(--range-control-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--range-control-fg) 12%);
+  color: var(--range-control-fg);
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .05);
+  box-shadow: 0 8px 18px var(--range-control-glow), inset 0 1px 0 rgba(255, 255, 255, .18);
 }
 
 .range-note {
