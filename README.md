@@ -48,21 +48,26 @@ Acronis parsing is enabled for daily status report and active-alert notification
 
 ## Recent Dashboard UX Updates
 
-The dashboard now includes a shared panel layout system across ESET, Acronis, and Xymon views:
+The dashboard now includes a shared widget and panel layout system across ESET, Acronis, and Xymon views:
 
-- Live `+` panel creation without refreshing the page or resetting the current layout
+- Live `+` panel and widget creation without refreshing the page or resetting the current layout
+- Movable, resizable, pinnable, renameable, recolorable, and deletable dashboard widgets
 - Movable, resizable, pinnable, renameable, recolorable, and deletable dashboard panels
+- Smooth resize and drag interactions, with widgets and panels snapping back to equal 12-column spacing intervals when released
 - Layout save/load slots for preserving different dashboard arrangements
-- A Default control that resets panel layout state when needed
-- Small pinned-state indicator dots on locked panels
+- A Default control that resets only the current dashboard and active layout profile
+- Draft-only layout edits until Save is clicked, with Undo support for recent layout changes
+- Small pinned-state indicator dots on locked panels and widgets
+- Time filters are now a full-width widget with the same layout tools and no-refresh filtering behavior
+- Metric widget clicks update dashboard filters in place without a full browser refresh
 - Dashboard-wide keyword search that behaves like a panel-aware Control-F, filtering visible rows/cards across panels and expanding matching panels
 - Collapsible Analytics, Alerts, and Escalations panels with consistent header controls and count behavior
-- Top-bar icon controls for mailbox status, sync health, theme mode, configuration, disconnect, layout slots, and custom panels
+- Polished top-bar controls for mailbox status, sync health, theme mode, configuration, disconnect, layout slots, and custom panel/widget actions
 - Mailbox and sync popovers that show connection health, Graph credential checks, Teams webhook status, sync cadence, and last sync time
-- Light/dark mode styling refinements, including improved contrast, panel layering, menu z-index handling, and screenshot-stable UI rendering
+- Light/dark mode styling refinements, including improved contrast, panel/widget layering, theme-aware menu styling, z-index handling, and screenshot-stable UI rendering
 - Company acronym hover titles and global overflow tooltips for truncated values
 
-These changes preserve the existing dashboard visual system while making the panels more configurable for daily operations.
+These changes preserve the existing dashboard visual system while making the dashboards more configurable for daily operations.
 
 ---
 

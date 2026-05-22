@@ -38,9 +38,11 @@
       <button class="panel-add-button" type="button" aria-label="Panel actions" aria-haspopup="true" aria-expanded="false" title="Panel actions">+</button>
       <div class="panel-add-menu">
         <button class="panel-add-action" type="button" data-layout-target="acronis">Add panel</button>
+        <button class="widget-add-action" type="button" data-widget-target="acronis">Add widget</button>
       </div>
     </div>
-    <button class="panel-reset-button" type="button" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
+    <button class="panel-reset-button" type="button" data-layout-target="acronis" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
+    <button class="panel-undo-button" type="button" data-layout-target="acronis" aria-label="Undo last layout change" title="Undo last layout change">Undo</button>
     <details class="nav-status-menu">
       <summary class="nav-status-item nav-status-icon-only {% if acronis_config.mailbox_address %}nav-status-good{% else %}nav-status-bad{% endif %}" aria-label="{% if acronis_config.mailbox_address %}Mailbox connected: {{ acronis_config.mailbox_address }}{% else %}Mailbox not connected{% endif %}" title="{% if acronis_config.mailbox_address %}Mailbox connected: {{ acronis_config.mailbox_address }}{% else %}Mailbox not connected{% endif %}">
         <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
@@ -104,58 +106,57 @@
 </section>
 {% endif %}
 
-<nav class="range-bar" aria-label="Acronis view range">
-  <div class="range-controls">
-    <div class="range-presets">
-      {% for preset in range_presets %}
-        <a class="preset-btn {% if not custom_range and active_days == preset.days %}active{% endif %}" href="/acronis?range={{ preset.days }}{% if active_metric %}&metric={{ active_metric }}{% endif %}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">{{ preset.short }}</a>
-      {% endfor %}
-    </div>
-    <form class="range-custom" action="/acronis" method="get">
-      {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
-      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
-      <button class="range-custom-trigger {% if custom_range %}active{% endif %}" type="button" aria-label="Choose custom date range">Custom range</button>
-      <input class="range-date-input range-date-start" type="date" name="start" value="{{ view_start }}" aria-label="Start date" tabindex="-1">
-      <input class="range-date-input range-date-end" type="date" name="end" value="{{ view_end }}" aria-label="End date" tabindex="-1">
-      <span class="range-path {% if custom_range %}active{% endif %}" aria-hidden="true"></span>
-      <span class="range-display">{{ range_display }}</span>
-    </form>
-  </div>
-  <form class="range-search" action="/acronis" method="get" role="search">
-    {% if custom_range %}
-      <input type="hidden" name="start" value="{{ view_start }}">
-      <input type="hidden" name="end" value="{{ view_end }}">
-    {% else %}
-      <input type="hidden" name="range" value="{{ active_days }}">
-    {% endif %}
-    {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
-    <input class="range-search-input" type="search" name="q" value="{{ search_query }}" placeholder=" " aria-label="Search for keyword">
-    <span class="range-search-label">Search for keyword</span>
-    {% if search_query %}
-      <a class="range-search-clear" href="/acronis?{{ range_query }}{% if active_metric %}&metric={{ active_metric }}{% endif %}" aria-label="Clear search">Clear</a>
-    {% endif %}
-  </form>
-</nav>
-
 {% set acronis_total = acronis_stats.critical + acronis_stats.error + acronis_stats.warning + acronis_stats.information %}
-<div class="stat-band">
-  <a class="stat-card {% if not active_metric %}active{% endif %}" href="/acronis?{{ range_query }}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+<div class="stat-band widget-layout" data-widget-layout-key="acronis">
+  <nav class="range-bar widget-card" data-widget-key="acronis-time-filters" data-widget-type="controls" data-default-span="12" aria-label="Acronis view range">
+    <div class="range-controls">
+      <div class="range-presets">
+        {% for preset in range_presets %}
+          <a class="preset-btn {% if not custom_range and active_days == preset.days %}active{% endif %}" href="/acronis?range={{ preset.days }}{% if active_metric %}&metric={{ active_metric }}{% endif %}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">{{ preset.short }}</a>
+        {% endfor %}
+      </div>
+      <form class="range-custom" action="/acronis" method="get">
+        {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        <button class="range-custom-trigger {% if custom_range %}active{% endif %}" type="button" aria-label="Choose custom date range">Custom range</button>
+        <input class="range-date-input range-date-start" type="date" name="start" value="{{ view_start }}" aria-label="Start date" tabindex="-1">
+        <input class="range-date-input range-date-end" type="date" name="end" value="{{ view_end }}" aria-label="End date" tabindex="-1">
+        <span class="range-path {% if custom_range %}active{% endif %}" aria-hidden="true"></span>
+        <span class="range-display">{{ range_display }}</span>
+      </form>
+    </div>
+    <form class="range-search" action="/acronis" method="get" role="search">
+      {% if custom_range %}
+        <input type="hidden" name="start" value="{{ view_start }}">
+        <input type="hidden" name="end" value="{{ view_end }}">
+      {% else %}
+        <input type="hidden" name="range" value="{{ active_days }}">
+      {% endif %}
+      {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
+      <input class="range-search-input" type="search" name="q" value="{{ search_query }}" placeholder=" " aria-label="Search for keyword">
+      <span class="range-search-label">Search for keyword</span>
+      {% if search_query %}
+        <a class="range-search-clear" href="/acronis?{{ range_query }}{% if active_metric %}&metric={{ active_metric }}{% endif %}" aria-label="Clear search">Clear</a>
+      {% endif %}
+    </form>
+  </nav>
+  <a class="stat-card widget-card {% if not active_metric %}active{% endif %}" data-widget-key="acronis-total" data-widget-type="tracker" data-default-span="3" href="/acronis?{{ range_query }}{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ acronis_total }}</span>
     <span class="stat-lbl">Total alerts</span>
   </a>
-  <a class="stat-card {% if active_metric == 'critical' %}active{% endif %}" href="/acronis?{{ range_query }}&metric=critical{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'critical' %}active{% endif %}" data-widget-key="acronis-critical" data-widget-type="tracker" data-default-span="3" href="/acronis?{{ range_query }}&metric=critical{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ acronis_stats.critical }}</span>
     <span class="stat-lbl">Critical</span>
   </a>
-  <a class="stat-card {% if active_metric == 'error' %}active{% endif %}" href="/acronis?{{ range_query }}&metric=error{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'error' %}active{% endif %}" data-widget-key="acronis-error" data-widget-type="tracker" data-default-span="3" href="/acronis?{{ range_query }}&metric=error{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ acronis_stats.error }}</span>
     <span class="stat-lbl">Error</span>
   </a>
-  <a class="stat-card {% if active_metric == 'warning' %}active{% endif %}" href="/acronis?{{ range_query }}&metric=warning{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card {% if active_metric == 'warning' %}active{% endif %}" data-widget-key="acronis-warning" data-widget-type="tracker" data-default-span="3" href="/acronis?{{ range_query }}&metric=warning{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ acronis_stats.warning }}</span>
     <span class="stat-lbl">Warning</span>
   </a>
-  <a class="stat-card acr-information {% if active_metric == 'information' %}active{% endif %}" href="/acronis?{{ range_query }}&metric=information{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
+  <a class="stat-card widget-card acr-information {% if active_metric == 'information' %}active{% endif %}" data-widget-key="acronis-information" data-widget-type="tracker" data-default-span="3" href="/acronis?{{ range_query }}&metric=information{% if search_query %}&q={{ search_query | urlencode }}{% endif %}">
     <span class="stat-val">{{ acronis_stats.information }}</span>
     <span class="stat-lbl">Information</span>
   </a>

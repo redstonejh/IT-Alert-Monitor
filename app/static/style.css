@@ -28,6 +28,16 @@
   --radius-sm: 12px;
 }
 
+html {
+  --panel-hover-tint: #ffffff;
+  --panel-hover-inset: rgba(255, 255, 255, .22);
+}
+
+html[data-theme="dark"] {
+  --panel-hover-tint: #020617;
+  --panel-hover-inset: rgba(255, 255, 255, .08);
+}
+
 html[data-theme="dark"] {
   --bg: #090f1c;
   --surface: #121b2b;
@@ -1752,6 +1762,64 @@ pre {
   overflow: visible;
 }
 
+.range-bar.widget-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  flex: 0 0 100% !important;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 0;
+  padding-right: 52px;
+  cursor: default;
+}
+
+.range-bar.widget-card:hover {
+  transform: translateY(-1px);
+}
+
+.range-bar.widget-card .range-controls,
+.range-bar.widget-card .range-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range-bar.widget-card .range-search {
+  min-width: 220px;
+  max-width: 260px;
+  flex-basis: 240px;
+}
+
+.range-bar.widget-card button,
+.range-bar.widget-card input,
+.range-bar.widget-card a,
+.range-bar.widget-card span {
+  font-family: inherit;
+  font-weight: 720;
+}
+
+.range-bar.widget-card .widget-tool-drawer {
+  background: var(--surface-raised) !important;
+  border-color: var(--line) !important;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .18) !important;
+}
+
+.range-bar.widget-card .widget-tools .panel-settings-toggle,
+.range-bar.widget-card .widget-tools .panel-tool-button {
+  color: var(--panel-lock-fg) !important;
+}
+
+.range-bar.widget-card .widget-tools .settings-icon,
+.range-bar.widget-card .widget-tools .move-icon,
+.range-bar.widget-card .widget-tools .resize-icon,
+.range-bar.widget-card .widget-tools .text-icon,
+.range-bar.widget-card .widget-tools .color-icon,
+.range-bar.widget-card .widget-tools .pin-icon,
+.range-bar.widget-card .widget-tools .trash-icon {
+  color: inherit !important;
+}
+
 .range-controls {
   display: contents;
 }
@@ -2029,8 +2097,19 @@ pre {
   margin-top: 16px;
 }
 
+.widget-layout {
+  --widget-gap: 12px;
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: var(--widget-gap);
+  justify-content: flex-start;
+}
+
 .stat-card {
+  position: relative;
   display: block;
+  flex: 1 1 180px;
   padding: 18px 20px 16px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-md);
@@ -2042,6 +2121,170 @@ pre {
   transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease, color .15s ease;
 }
 
+.widget-card {
+  flex-grow: 0;
+  flex-shrink: 0;
+  min-width: 126px;
+  min-height: 90px;
+  overflow: visible;
+}
+
+.widget-card-custom {
+  background: color-mix(in srgb, var(--surface) 86%, var(--panel-accent, var(--blue)) 14%);
+  border-color: color-mix(in srgb, var(--panel-accent, var(--blue)) 34%, var(--line));
+}
+
+.widget-card.db-panel-custom-color {
+  background: color-mix(in srgb, var(--surface) 82%, var(--panel-accent, var(--blue)) 18%);
+  border-color: color-mix(in srgb, var(--panel-accent, var(--blue)) 46%, var(--line));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--panel-accent, var(--blue)) 16%, transparent);
+}
+
+.widget-card.db-panel-custom-color:hover,
+.widget-card.db-panel-custom-color.active {
+  background: color-mix(in srgb, var(--surface) 76%, var(--panel-accent, var(--blue)) 24%);
+  border-color: color-mix(in srgb, var(--panel-accent, var(--blue)) 68%, white);
+}
+
+.widget-card.db-panel-custom-color:hover .stat-val,
+.widget-card.db-panel-custom-color:hover .stat-lbl {
+  color: var(--panel-accent-text);
+}
+
+.widget-card .stat-lbl[contenteditable="true"] {
+  display: inline-block;
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  cursor: text;
+  text-overflow: clip;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.widget-tools {
+  --panel-lock-bg: rgba(37, 99, 235, .12);
+  --panel-lock-fg: var(--blue);
+  --panel-lock-border: rgba(37, 99, 235, .26);
+  --panel-lock-glow: rgba(37, 99, 235, .18);
+  --panel-drawer-bg: rgba(37, 99, 235, .18);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-card.widget-tools-open,
+.widget-card:has(> .widget-tools:focus-within) {
+  z-index: 120;
+}
+
+body.layout-tools-active .widget-card:not(.widget-tools-open):not(:has(> .widget-tools:focus-within)) .widget-tools {
+  pointer-events: none;
+}
+
+body.layout-tools-active .widget-card:not(.widget-tools-open):not(:has(> .widget-tools:focus-within)) {
+  pointer-events: none;
+}
+
+.widget-tool-drawer {
+  position: absolute;
+  top: -10px;
+  left: auto;
+  right: 42px;
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  gap: 5px;
+  padding: 6px;
+  border: 1.5px solid var(--panel-lock-border, rgba(37, 99, 235, .24));
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-lock-fg) 8%);
+  border-color: color-mix(in srgb, var(--panel-lock-fg) 42%, var(--line));
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .18), 0 0 18px var(--panel-lock-glow, rgba(37, 99, 235, .16));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(14px, -6px) scale(.84);
+  transform-origin: top right;
+  transition: transform .18s ease, opacity .14s ease, background .16s ease, border-color .16s ease, visibility 0s linear .18s;
+  z-index: 121;
+}
+
+.widget-tools-open .widget-tool-drawer,
+.widget-tools:focus-within .widget-tool-drawer {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, -6px) scale(1);
+  transition: transform .18s ease, opacity .14s ease, background .16s ease, border-color .16s ease, visibility 0s linear 0s;
+}
+
+.widget-tool-drawer::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -12px;
+  width: 14px;
+  height: calc(100% + 8px);
+}
+
+.widget-card .panel-settings-toggle,
+.widget-card .panel-tool-button {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  min-height: 34px;
+  max-height: 34px;
+}
+
+.widget-card.db-panel-pinned::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 9;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255, 255, 255, .88);
+  border-radius: 999px;
+  background: var(--panel-accent, var(--blue));
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, .10), 0 0 10px color-mix(in srgb, var(--panel-accent, var(--blue)) 42%, transparent);
+  pointer-events: none;
+}
+
+.widget-card.db-panel-pinned .panel-move-handle,
+.widget-card.db-panel-pinned .panel-resize-handle {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.widget-placeholder {
+  flex: 0 0 180px;
+  min-height: 90px;
+  border: 1.5px dashed var(--blue);
+  border-radius: var(--radius-md);
+  background: rgba(37, 99, 235, .12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16), 0 0 20px rgba(37, 99, 235, .12);
+  transition: flex-basis .14s ease, min-height .14s ease, background .14s ease, border-color .14s ease;
+  will-change: transform;
+}
+
+.widget-dragging {
+  position: fixed !important;
+  z-index: 90;
+  pointer-events: none;
+  opacity: .94;
+  transform: rotate(.12deg) scale(1.006);
+  box-shadow: 0 26px 58px rgba(15, 23, 42, .24), 0 0 0 1px rgba(37, 99, 235, .18);
+}
+
 .stat-card:hover,
 .stat-card.active {
   background: #f7faff;
@@ -2049,20 +2292,40 @@ pre {
 }
 
 .stat-card:hover {
-  box-shadow: 0 14px 32px rgba(37, 99, 235, .14);
-  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, .12), 0 1px 0 rgba(255, 255, 255, .62) inset;
+  transform: translateY(-1.5px);
 }
 
 .stat-card.active {
   border-color: var(--blue);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .18), 0 0 0 3px rgba(37, 99, 235, .12), var(--shadow-soft);
+  outline: 3px solid color-mix(in srgb, var(--blue) 78%, white);
+  outline-offset: 0;
+  box-shadow:
+    0 16px 34px rgba(15, 23, 42, .18),
+    0 10px 24px rgba(37, 99, 235, .16),
+    var(--shadow-soft);
+}
+
+.widget-layout > .stat-card:hover {
+  border-color: #5f91ee;
+  box-shadow:
+    0 14px 30px rgba(15, 23, 42, .14),
+    0 1px 0 rgba(255, 255, 255, .62) inset;
+}
+
+.widget-layout > .stat-card.active:hover {
+  border-color: #2563eb;
+  outline-color: #2563eb;
+  box-shadow:
+    0 18px 38px rgba(15, 23, 42, .22),
+    0 12px 28px rgba(37, 99, 235, .18);
 }
 
 .stat-card:hover .stat-val,
 .stat-card:hover .stat-lbl,
 .stat-card.active .stat-val,
 .stat-card.active .stat-lbl {
-  color: #1d4ed8;
+  color: var(--ink-strong);
 }
 
 .stat-val {
@@ -2293,13 +2556,24 @@ pre {
 }
 
 .panel-layout {
+  --panel-gap: 16px;
   display: flex;
   flex-wrap: wrap;
   align-items: start;
-  gap: 16px;
+  gap: var(--panel-gap);
+  justify-content: flex-start;
   margin-top: 16px;
   overflow-x: auto;
   padding-bottom: 2px;
+}
+
+.panel-layout:has(.db-panel-tools-open),
+.panel-layout:has(.panel-tools:focus-within) {
+  overflow: visible;
+}
+
+.panel-layout:has(.db-panel-tools-open) {
+  overflow: visible;
 }
 
 .db-grid {
@@ -2353,8 +2627,30 @@ pre {
 }
 
 .db-panel.db-panel-tools-open {
+  overflow: visible;
   transform: none !important;
-  z-index: 70;
+  z-index: 120;
+}
+
+.db-panel.db-panel-tools-open > .db-panel-hd {
+  border-radius: 14.5px 14.5px 0 0;
+  background-clip: padding-box;
+}
+
+.db-panel.db-panel-collapsed.db-panel-tools-open > .db-panel-hd {
+  border-radius: 14.5px;
+  background-clip: padding-box;
+}
+
+.db-panel.db-panel-tools-open > .db-panel-hd:hover,
+.db-panel.db-panel-tools-open > .db-panel-hd:focus-visible {
+  box-shadow: inset 0 0 0 1px transparent;
+}
+
+.db-panel.db-panel-tools-open:hover,
+.db-panel.db-panel-tools-open:focus-within {
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .db-panel:hover,
@@ -2363,6 +2659,13 @@ pre {
   background: #f7faff;
   border-color: #8fb4f4;
   box-shadow: 0 10px 24px rgba(37, 99, 235, .12), 0 1px 0 rgba(255, 255, 255, .62) inset;
+}
+
+.db-panel.db-panel-collapsed:hover,
+.db-panel.db-panel-collapsed:focus-within {
+  transform: none;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .db-panel:active {
@@ -2435,7 +2738,7 @@ pre {
 .db-panel-hd:focus-visible::before {
   filter: none;
   border-color: currentColor;
-  box-shadow: 0 10px 20px var(--panel-header-control-glow), 0 0 12px var(--panel-header-control-glow), inset 0 1px 0 rgba(255, 255, 255, .20);
+  box-shadow: 0 10px 20px var(--panel-header-control-glow), 0 0 12px var(--panel-header-control-glow), inset 0 1px 0 var(--panel-hover-inset);
   transform: none;
 }
 
@@ -2575,9 +2878,9 @@ pre {
 .panel-pin-toggle:focus-visible,
 .panel-pin-toggle:active {
   transform: none;
-  background: color-mix(in srgb, var(--panel-lock-bg) 75%, white);
+  background: color-mix(in srgb, var(--panel-lock-bg) 75%, var(--panel-hover-tint));
   border-color: currentColor;
-  box-shadow: 0 14px 28px var(--panel-lock-glow), 0 0 22px var(--panel-lock-glow), inset 0 1px 0 rgba(255, 255, 255, .22);
+  box-shadow: 0 14px 28px var(--panel-lock-glow), 0 0 22px var(--panel-lock-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 .panel-lock-toggle:focus-visible,
@@ -2602,9 +2905,9 @@ pre {
 }
 
 .db-panel-unlocked .panel-lock-toggle {
-  background: color-mix(in srgb, var(--panel-lock-bg) 64%, white);
+  background: color-mix(in srgb, var(--panel-lock-bg) 64%, var(--panel-hover-tint));
   border-color: currentColor;
-  box-shadow: 0 14px 30px var(--panel-lock-glow), 0 0 24px var(--panel-lock-glow), inset 0 1px 0 rgba(255, 255, 255, .24);
+  box-shadow: 0 14px 30px var(--panel-lock-glow), 0 0 24px var(--panel-lock-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 .db-panel-unlocked .lock-icon {
@@ -2628,9 +2931,9 @@ pre {
 }
 
 .db-panel-pinned .panel-pin-toggle {
-  background: color-mix(in srgb, var(--panel-lock-bg) 56%, white);
+  background: color-mix(in srgb, var(--panel-lock-bg) 56%, var(--panel-hover-tint));
   border-color: currentColor;
-  box-shadow: 0 14px 30px var(--panel-lock-glow), 0 0 26px var(--panel-lock-glow), inset 0 1px 0 rgba(255, 255, 255, .28);
+  box-shadow: 0 14px 30px var(--panel-lock-glow), 0 0 26px var(--panel-lock-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 .db-panel-pinned {
@@ -2690,6 +2993,8 @@ body.panel-interaction-active * {
 
 body.panel-interaction-active .db-panel,
 body.panel-interaction-active .db-panel-placeholder,
+body.panel-interaction-active .widget-card,
+body.panel-interaction-active .widget-placeholder,
 body.panel-interaction-active .panel-tool-drawer,
 body.panel-interaction-active .panel-settings-toggle,
 body.panel-interaction-active .panel-tool-button {
@@ -2750,25 +3055,36 @@ body.panel-interaction-active .db-panel:active {
   flex-shrink: 0;
 }
 
+body.layout-tools-active .db-panel:not(.db-panel-tools-open):not(:has(.panel-tools:focus-within)) .panel-tools {
+  pointer-events: none;
+}
+
+body.layout-tools-active .db-panel:not(.db-panel-tools-open):not(:has(.panel-tools:focus-within)) {
+  pointer-events: none;
+}
+
 .panel-tool-drawer {
   position: absolute;
-  top: 50%;
+  top: -10px;
   right: 42px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  gap: 5px;
+  padding: 6px;
   border: 1.5px solid var(--panel-lock-border, rgba(37, 99, 235, .24));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-raised) 72%, var(--panel-lock-fg) 28%);
-  box-shadow: 0 14px 30px var(--panel-lock-glow, rgba(37, 99, 235, .16));
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-lock-fg) 8%);
+  border-color: color-mix(in srgb, var(--panel-lock-fg) 42%, var(--line));
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .18), 0 0 18px var(--panel-lock-glow, rgba(37, 99, 235, .16));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
-  transform: translate(12px, -50%) scaleX(.72);
-  transform-origin: right center;
+  transform: translate(14px, -6px) scale(.84);
+  transform-origin: top right;
   transition: transform .18s ease, opacity .14s ease, background .16s ease, border-color .16s ease, visibility 0s linear .18s;
-  z-index: 3;
+  z-index: 121;
 }
 
 .db-panel-tools-open .panel-tool-drawer,
@@ -2776,7 +3092,7 @@ body.panel-interaction-active .db-panel:active {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
-  transform: translate(0, -50%) scaleX(1);
+  transform: translate(0, -6px) scale(1);
   transition: transform .18s ease, opacity .14s ease, background .16s ease, border-color .16s ease, visibility 0s linear 0s;
 }
 
@@ -2836,13 +3152,14 @@ body.panel-interaction-active .db-panel:active {
 .panel-settings-toggle:focus-visible,
 .panel-settings-toggle:active,
 .db-panel-tools-open .panel-settings-toggle,
+.widget-tools-open .panel-settings-toggle,
 .panel-tool-button:hover,
 .panel-tool-button:focus-visible,
 .panel-tool-button:active {
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--panel-lock-bg) 75%, white);
+  background: color-mix(in srgb, var(--panel-lock-bg) 75%, var(--panel-hover-tint));
   border-color: currentColor;
-  box-shadow: 0 14px 28px var(--panel-lock-glow), 0 0 22px var(--panel-lock-glow), inset 0 1px 0 rgba(255, 255, 255, .22);
+  box-shadow: 0 14px 28px var(--panel-lock-glow), 0 0 22px var(--panel-lock-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 .panel-tool-button:active,
@@ -3013,17 +3330,22 @@ body.panel-interaction-active .db-panel:active {
 .panel-color-swatch:hover,
 .panel-color-swatch:focus,
 .panel-color-swatch:focus-visible,
-.panel-color-swatch:active {
+.panel-color-swatch:active,
+.panel-color-swatch.is-selected {
   background: var(--swatch) !important;
   background-color: var(--swatch) !important;
   transform: translateY(-1px) scale(1.04);
-  border-color: color-mix(in srgb, var(--swatch) 42%, white);
+  border-color: color-mix(in srgb, var(--panel-accent, var(--swatch)) 62%, var(--panel-hover-tint));
   box-shadow:
     0 8px 16px rgba(15, 23, 42, .22),
-    0 0 0 3px color-mix(in srgb, var(--swatch) 28%, rgba(255, 255, 255, .72)),
-    0 0 14px color-mix(in srgb, var(--swatch) 28%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--panel-accent, var(--swatch)) 34%, transparent),
+    0 0 14px color-mix(in srgb, var(--panel-accent, var(--swatch)) 28%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, .30);
   outline: 0 !important;
+}
+
+.panel-color-swatch.is-selected {
+  transform: scale(1.08);
 }
 
 html[data-theme="dark"] .panel-color-menu {
@@ -3057,15 +3379,11 @@ html[data-theme="dark"] .panel-color-label {
 .db-panel-custom-color > .db-panel-hd:hover,
 .db-panel-custom-color > .db-panel-hd:focus-visible {
   background: linear-gradient(90deg, rgba(var(--panel-accent-rgb), .42), rgba(var(--panel-accent-rgb), .26));
-  border-color: color-mix(in srgb, var(--panel-accent) 62%, white);
+  border-color: color-mix(in srgb, var(--panel-accent) 62%, var(--panel-hover-tint));
   box-shadow: none;
 }
 
 .db-panel-custom-color > .db-panel-hd .db-panel-title {
-  color: var(--panel-accent-text);
-}
-
-.db-panel-custom-title > .db-panel-hd .db-panel-title {
   color: var(--panel-accent-text);
 }
 
@@ -3098,9 +3416,9 @@ html[data-theme="dark"] .panel-color-label {
 }
 
 .db-panel-custom-color .panel-tool-drawer {
-  background: color-mix(in srgb, var(--surface-raised) 72%, var(--panel-accent) 28%);
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-accent) 8%);
   border-color: rgba(var(--panel-accent-rgb), .42);
-  box-shadow: 0 14px 30px rgba(var(--panel-accent-rgb), .16), inset 0 1px 0 rgba(255, 255, 255, .14);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .18), 0 0 18px rgba(var(--panel-accent-rgb), .16);
 }
 
 .db-panel-placeholder {
@@ -4190,6 +4508,7 @@ html[data-theme="dark"] .panel-color-label {
 
 .theme-toggle,
 .panel-reset-button,
+.panel-undo-button,
 .panel-add-button,
 .layout-slot-button,
 .layout-slot-trigger {
@@ -4218,6 +4537,7 @@ html[data-theme="dark"] .panel-color-label {
 }
 
 .panel-reset-button,
+.panel-undo-button,
 .panel-add-button,
 .layout-slot-button,
 .layout-slot-trigger {
@@ -4277,7 +4597,8 @@ html[data-theme="dark"] .panel-color-label {
   transition-delay: 0s;
 }
 
-.panel-add-action {
+.panel-add-action,
+.widget-add-action {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4297,7 +4618,9 @@ html[data-theme="dark"] .panel-color-label {
 }
 
 .panel-add-action:hover,
-.panel-add-action:focus-visible {
+.panel-add-action:focus-visible,
+.widget-add-action:hover,
+.widget-add-action:focus-visible {
   border-color: #bfdbfe;
   background: var(--surface-soft);
   color: var(--blue);
@@ -4410,8 +4733,10 @@ html[data-theme="dark"] .panel-color-label {
 
 .theme-toggle:hover,
 .panel-reset-button:hover,
+.panel-undo-button:hover,
 .panel-add-button:hover,
 .panel-add-action:hover,
+.widget-add-action:hover,
 .layout-slot-button:hover,
 .layout-slot-trigger:hover {
   border-color: #bfdbfe;
@@ -4421,8 +4746,10 @@ html[data-theme="dark"] .panel-color-label {
 
 .theme-toggle:focus-visible,
 .panel-reset-button:focus-visible,
+.panel-undo-button:focus-visible,
 .panel-add-button:focus-visible,
 .panel-add-action:focus-visible,
+.widget-add-action:focus-visible,
 .layout-slot-button:focus-visible,
 .layout-slot-trigger:focus-visible {
   outline: 3px solid rgba(37, 99, 235, .20);
@@ -4451,6 +4778,8 @@ html[data-theme="dark"] .panel-color-label {
 .app-nav:not(.settings-nav) .theme-toggle:focus-visible,
 .app-nav:not(.settings-nav) .panel-reset-button:hover,
 .app-nav:not(.settings-nav) .panel-reset-button:focus-visible,
+.app-nav:not(.settings-nav) .panel-undo-button:hover,
+.app-nav:not(.settings-nav) .panel-undo-button:focus-visible,
 .app-nav:not(.settings-nav) .panel-add-button:hover,
 .app-nav:not(.settings-nav) .panel-add-button:focus-visible,
 .app-nav:not(.settings-nav) .panel-add-action:hover,
@@ -4476,6 +4805,7 @@ html[data-theme="dark"] .panel-color-label {
 .app-nav:not(.settings-nav) .cmd-btn:active,
 .app-nav:not(.settings-nav) .theme-toggle:active,
 .app-nav:not(.settings-nav) .panel-reset-button:active,
+.app-nav:not(.settings-nav) .panel-undo-button:active,
 .app-nav:not(.settings-nav) .panel-add-button:active,
 .app-nav:not(.settings-nav) .layout-slot-button:active,
 .settings-nav .nav-status-item:active {
@@ -4524,7 +4854,7 @@ html[data-theme="dark"] .panel-color-label {
 }
 
 .stat-card:hover {
-  box-shadow: 0 16px 34px rgba(15, 23, 42, .10);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, .12), 0 1px 0 rgba(255, 255, 255, .62) inset;
 }
 
 .stat-danger { background: linear-gradient(180deg, #fff7f7, #fef2f2); }
@@ -5549,8 +5879,10 @@ html[data-theme="dark"] .preset-btn,
 html[data-theme="dark"] button.dash-switch-btn,
 html[data-theme="dark"] .theme-toggle,
 html[data-theme="dark"] .panel-reset-button,
+html[data-theme="dark"] .panel-undo-button,
 html[data-theme="dark"] .panel-add-button,
 html[data-theme="dark"] .panel-add-action,
+html[data-theme="dark"] .widget-add-action,
 html[data-theme="dark"] .layout-slot-button,
 html[data-theme="dark"] .layout-slot-trigger {
   background: #1b2b43;
@@ -5973,8 +6305,10 @@ html[data-theme="dark"] .dash-switch-opt:hover,
 html[data-theme="dark"] button.dash-switch-btn:hover,
 html[data-theme="dark"] .theme-toggle:hover,
 html[data-theme="dark"] .panel-reset-button:hover,
+html[data-theme="dark"] .panel-undo-button:hover,
 html[data-theme="dark"] .panel-add-button:hover,
 html[data-theme="dark"] .panel-add-action:hover,
+html[data-theme="dark"] .widget-add-action:hover,
 html[data-theme="dark"] .layout-slot-button:hover,
 html[data-theme="dark"] .layout-slot-trigger:hover {
   background: #213653;
@@ -6277,8 +6611,10 @@ html[data-theme="dark"] .range-custom-trigger,
 html[data-theme="dark"] .range-display,
 html[data-theme="dark"] .theme-toggle,
 html[data-theme="dark"] .panel-reset-button,
+html[data-theme="dark"] .panel-undo-button,
 html[data-theme="dark"] .panel-add-button,
 html[data-theme="dark"] .panel-add-action,
+html[data-theme="dark"] .widget-add-action,
 html[data-theme="dark"] .layout-slot-button,
 html[data-theme="dark"] .layout-slot-trigger {
   outline: 1px solid rgba(147, 179, 222, .08);
@@ -6425,7 +6761,7 @@ html[data-theme="dark"] .db-panel:has(> .db-panel-hd-escalations) .panel-tool-bu
 }
 
 html[data-theme="dark"] .panel-tool-drawer {
-  background: color-mix(in srgb, var(--surface-raised) 70%, var(--panel-lock-fg) 30%);
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-lock-fg) 8%);
   border-color: var(--panel-lock-border, rgba(117, 185, 255, .28));
 }
 
@@ -6434,7 +6770,7 @@ html[data-theme="dark"] .db-panel-custom-color > .db-panel-hd {
 }
 
 html[data-theme="dark"] .db-panel-custom-color .panel-tool-drawer {
-  background: color-mix(in srgb, var(--surface-raised) 64%, var(--panel-accent) 36%);
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-accent) 8%);
   border-color: rgba(var(--panel-accent-rgb), .56);
 }
 
@@ -6467,10 +6803,27 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color {
     0 0 14px rgba(var(--panel-accent-rgb), .10);
 }
 
+.db-panel.db-panel-custom-color.db-panel-collapsed:hover,
+.db-panel.db-panel-custom-color.db-panel-collapsed:focus-within {
+  border-color: color-mix(in srgb, var(--panel-accent) 62%, white);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px rgba(var(--panel-accent-rgb), .10);
+}
+
 html[data-theme="dark"] .db-panel:hover,
 html[data-theme="dark"] .db-panel:focus-within {
   border-color: rgba(103, 169, 255, .78);
   box-shadow: 0 14px 34px rgba(0, 0, 0, .32), 0 0 18px rgba(103, 169, 255, .12), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+html[data-theme="dark"] .db-panel.db-panel-collapsed:hover,
+html[data-theme="dark"] .db-panel.db-panel-collapsed:focus-within {
+  transform: none;
+  background: var(--surface);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .38),
+    0 1px 0 rgba(255, 255, 255, .035) inset;
 }
 
 .db-panel.db-panel-custom-color > .db-panel-hd,
@@ -6495,11 +6848,6 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd:focus-vis
 
 .db-panel.db-panel-custom-color > .db-panel-hd .db-panel-title,
 html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd .db-panel-title {
-  color: var(--panel-accent-text);
-}
-
-.db-panel.db-panel-custom-title > .db-panel-hd .db-panel-title,
-html[data-theme="dark"] .db-panel.db-panel-custom-title > .db-panel-hd .db-panel-title {
   color: var(--panel-accent-text);
 }
 
@@ -6541,16 +6889,18 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tools {
 
 .db-panel.db-panel-custom-color .panel-tool-drawer,
 html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-drawer {
-  background: color-mix(in srgb, var(--surface-raised) 72%, var(--panel-accent) 28%);
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-accent) 8%);
   border-color: rgba(var(--panel-accent-rgb), .46);
-  box-shadow: 0 14px 30px rgba(var(--panel-accent-rgb), .18), inset 0 1px 0 rgba(255, 255, 255, .16);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .18), 0 0 18px rgba(var(--panel-accent-rgb), .16);
 }
 
 .db-panel.db-panel-tools-open .panel-settings-toggle,
-html[data-theme="dark"] .db-panel.db-panel-tools-open .panel-settings-toggle {
-  background: color-mix(in srgb, var(--panel-lock-bg) 75%, white);
+html[data-theme="dark"] .db-panel.db-panel-tools-open .panel-settings-toggle,
+.widget-card.widget-tools-open .panel-settings-toggle,
+html[data-theme="dark"] .widget-card.widget-tools-open .panel-settings-toggle {
+  background: color-mix(in srgb, var(--panel-lock-bg) 75%, var(--panel-hover-tint));
   border-color: currentColor;
-  box-shadow: 0 10px 20px var(--panel-lock-glow), 0 0 12px var(--panel-lock-glow), inset 0 1px 0 rgba(255, 255, 255, .20);
+  box-shadow: 0 10px 20px var(--panel-lock-glow), 0 0 12px var(--panel-lock-glow), inset 0 1px 0 var(--panel-hover-inset);
 }
 
 html[data-theme="dark"] .db-panel-body,
@@ -6600,11 +6950,18 @@ html:not([data-theme="dark"]) .db-panel.db-panel-custom-color {
 
 html:not([data-theme="dark"]) .db-panel.db-panel-custom-color:hover,
 html:not([data-theme="dark"]) .db-panel.db-panel-custom-color:focus-within {
-  border-color: color-mix(in srgb, var(--panel-accent) 78%, white) !important;
+  border-color: color-mix(in srgb, var(--panel-accent) 78%, var(--panel-hover-tint)) !important;
   box-shadow:
-    0 9px 20px rgba(15, 23, 42, .10),
-    0 0 0 1px rgba(var(--panel-accent-rgb), .18),
-    0 0 14px rgba(var(--panel-accent-rgb), .10) !important;
+    var(--shadow-card),
+    0 0 0 1px rgba(var(--panel-accent-rgb), .12) !important;
+}
+
+html:not([data-theme="dark"]) .db-panel.db-panel-custom-color.db-panel-collapsed:hover,
+html:not([data-theme="dark"]) .db-panel.db-panel-custom-color.db-panel-collapsed:focus-within {
+  border-color: color-mix(in srgb, var(--panel-accent) 62%, white) !important;
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px rgba(var(--panel-accent-rgb), .10) !important;
 }
 
 html[data-theme="dark"] .db-panel.db-panel-custom-color {
@@ -6618,7 +6975,7 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color {
 
 html[data-theme="dark"] .db-panel.db-panel-custom-color:hover,
 html[data-theme="dark"] .db-panel.db-panel-custom-color:focus-within {
-  border-color: color-mix(in srgb, var(--panel-accent) 74%, white) !important;
+  border-color: color-mix(in srgb, var(--panel-accent) 74%, var(--panel-hover-tint)) !important;
   box-shadow:
     0 18px 42px rgba(0, 0, 0, .38),
     0 1px 0 rgba(255, 255, 255, .04) inset,
@@ -6626,11 +6983,21 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color:focus-within {
     0 0 24px rgba(var(--panel-accent-rgb), .16) !important;
 }
 
+html[data-theme="dark"] .db-panel.db-panel-custom-color.db-panel-collapsed:hover,
+html[data-theme="dark"] .db-panel.db-panel-custom-color.db-panel-collapsed:focus-within {
+  border-color: color-mix(in srgb, var(--panel-accent) 58%, white) !important;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .38),
+    0 1px 0 rgba(255, 255, 255, .035) inset,
+    0 0 0 1px rgba(var(--panel-accent-rgb), .30),
+    0 0 20px rgba(var(--panel-accent-rgb), .12) !important;
+}
+
 .db-panel.db-panel-custom-color > .db-panel-hd,
 html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd {
   --panel-header-control-bg: color-mix(in srgb, var(--surface-raised) 50%, var(--panel-accent) 50%) !important;
   --panel-header-control-fg: var(--panel-accent-text) !important;
-  --panel-header-control-border: color-mix(in srgb, var(--panel-accent) 55%, white) !important;
+  --panel-header-control-border: color-mix(in srgb, var(--panel-accent) 55%, var(--panel-hover-tint)) !important;
   --panel-header-control-glow: rgba(var(--panel-accent-rgb), .24) !important;
   --panel-lock-bg: color-mix(in srgb, var(--surface-raised) 62%, var(--panel-accent) 38%) !important;
   --panel-lock-fg: var(--panel-accent-text) !important;
@@ -6647,14 +7014,12 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd {
 html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd:hover,
 html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd:focus-visible {
   background: linear-gradient(90deg, rgba(var(--panel-accent-rgb), .58), rgba(var(--panel-accent-rgb), .34)) !important;
-  border-color: color-mix(in srgb, var(--panel-accent) 64%, white) !important;
+  border-color: color-mix(in srgb, var(--panel-accent) 64%, var(--panel-hover-tint)) !important;
   box-shadow: none !important;
 }
 
 .db-panel.db-panel-custom-color > .db-panel-hd .db-panel-title,
-.db-panel.db-panel-custom-title > .db-panel-hd .db-panel-title,
-html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd .db-panel-title,
-html[data-theme="dark"] .db-panel.db-panel-custom-title > .db-panel-hd .db-panel-title {
+html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd .db-panel-title {
   color: var(--panel-accent-text) !important;
 }
 
@@ -6701,23 +7066,30 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-button {
 .db-panel.db-panel-custom-color .panel-pin-toggle:hover,
 .db-panel.db-panel-custom-color .panel-settings-toggle:hover,
 .db-panel.db-panel-custom-color .panel-tool-button:hover,
+.widget-card.db-panel-custom-color .panel-settings-toggle:hover,
+.widget-card.db-panel-custom-color .panel-tool-button:hover,
 .db-panel.db-panel-custom-color .panel-lock-toggle:focus-visible,
 .db-panel.db-panel-custom-color .panel-pin-toggle:focus-visible,
 .db-panel.db-panel-custom-color .panel-settings-toggle:focus-visible,
 .db-panel.db-panel-custom-color .panel-tool-button:focus-visible,
+.widget-card.db-panel-custom-color .panel-settings-toggle:focus-visible,
+.widget-card.db-panel-custom-color .panel-tool-button:focus-visible,
 .db-panel.db-panel-custom-color .panel-lock-toggle:active,
 .db-panel.db-panel-custom-color .panel-pin-toggle:active,
 .db-panel.db-panel-custom-color .panel-settings-toggle:active,
 .db-panel.db-panel-custom-color .panel-tool-button:active,
-.db-panel.db-panel-custom-color.db-panel-tools-open .panel-settings-toggle {
+.widget-card.db-panel-custom-color .panel-settings-toggle:active,
+.widget-card.db-panel-custom-color .panel-tool-button:active,
+.db-panel.db-panel-custom-color.db-panel-tools-open .panel-settings-toggle,
+.widget-card.db-panel-custom-color.widget-tools-open .panel-settings-toggle {
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--panel-lock-bg) 72%, white) !important;
-  border-color: color-mix(in srgb, var(--panel-accent) 70%, white) !important;
+  background: color-mix(in srgb, var(--panel-lock-bg) 72%, var(--panel-hover-tint)) !important;
+  border-color: color-mix(in srgb, var(--panel-accent) 70%, var(--panel-hover-tint)) !important;
   color: var(--panel-lock-fg) !important;
   box-shadow:
     0 12px 24px var(--panel-lock-glow),
     0 0 16px var(--panel-lock-glow),
-    inset 0 1px 0 rgba(255, 255, 255, .22) !important;
+    inset 0 1px 0 var(--panel-hover-inset) !important;
 }
 
 .db-panel.db-panel-custom-color .panel-lock-toggle:active,
@@ -6729,11 +7101,11 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-button {
 
 .db-panel.db-panel-custom-color .panel-tool-drawer,
 html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-drawer {
-  background: color-mix(in srgb, var(--surface-raised) 70%, var(--panel-accent) 30%) !important;
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-accent) 8%) !important;
   border-color: rgba(var(--panel-accent-rgb), .46) !important;
   box-shadow:
-    0 14px 30px rgba(var(--panel-accent-rgb), .16),
-    inset 0 1px 0 rgba(255, 255, 255, .16) !important;
+    0 14px 32px rgba(15, 23, 42, .18),
+    0 0 18px rgba(var(--panel-accent-rgb), .16) !important;
 }
 
 .db-panel.db-panel-custom-color .al-table th,
@@ -6848,17 +7220,27 @@ html[data-theme="dark"] .db-panel.db-panel-custom-color .db-panel-body::-webkit-
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(-4px) scale(.98);
+  clip-path: inset(0 0 100% 0 round 16px);
+  transform: translateY(-6px) scale(.94);
   transform-origin: top right;
-  transition: opacity .14s ease, transform .16s ease, visibility 0s linear .16s;
+  transition:
+    opacity .16s ease,
+    transform .20s cubic-bezier(.2, .8, .2, 1),
+    clip-path .22s cubic-bezier(.2, .8, .2, 1),
+    visibility 0s linear .20s;
 }
 
-.nav-status-menu[open] .nav-status-popover {
+.nav-status-menu.is-open .nav-status-popover {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  clip-path: inset(0 0 0 0 round 16px);
   transform: translateY(0) scale(1);
-  transition: opacity .14s ease, transform .16s ease, visibility 0s linear 0s;
+  transition:
+    opacity .16s ease,
+    transform .20s cubic-bezier(.2, .8, .2, 1),
+    clip-path .22s cubic-bezier(.2, .8, .2, 1),
+    visibility 0s linear 0s;
 }
 
 .nav-status-popover strong {
@@ -7030,12 +7412,12 @@ html[data-theme="dark"] .nav-status-popover {
 .panel-tool-drawer .panel-tool-button:focus-visible,
 .panel-settings-toggle:focus-visible {
   outline: none !important;
-  border-color: color-mix(in srgb, currentColor 72%, white) !important;
+  border-color: color-mix(in srgb, currentColor 72%, var(--panel-hover-tint)) !important;
   box-shadow:
     0 0 0 3px color-mix(in srgb, currentColor 28%, transparent),
     0 12px 24px var(--panel-lock-glow, rgba(37, 99, 235, .22)),
     0 0 18px var(--panel-lock-glow, rgba(37, 99, 235, .18)),
-    inset 0 1px 0 rgba(255, 255, 255, .24) !important;
+    inset 0 1px 0 var(--panel-hover-inset) !important;
 }
 
 .db-panel.db-panel-custom-color .panel-tool-drawer .panel-tool-button:focus-visible,
@@ -7043,12 +7425,12 @@ html[data-theme="dark"] .nav-status-popover {
 html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-drawer .panel-tool-button:focus-visible,
 html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-settings-toggle:focus-visible {
   outline: none !important;
-  border-color: color-mix(in srgb, var(--panel-accent) 76%, white) !important;
+  border-color: color-mix(in srgb, var(--panel-accent) 76%, var(--panel-hover-tint)) !important;
   box-shadow:
     0 0 0 3px rgba(var(--panel-accent-rgb), .30),
     0 12px 24px rgba(var(--panel-accent-rgb), .24),
     0 0 18px rgba(var(--panel-accent-rgb), .18),
-    inset 0 1px 0 rgba(255, 255, 255, .24) !important;
+    inset 0 1px 0 var(--panel-hover-inset) !important;
 }
 
 html[data-theme="dark"] .panel-tool-drawer .panel-tool-button:focus-visible,
@@ -7057,7 +7439,565 @@ html[data-theme="dark"] .panel-settings-toggle:focus-visible {
     0 0 0 3px color-mix(in srgb, currentColor 34%, transparent),
     0 12px 28px rgba(0, 0, 0, .34),
     0 0 22px var(--panel-lock-glow, rgba(103, 169, 255, .20)),
-    inset 0 1px 0 rgba(255, 255, 255, .18) !important;
+    inset 0 1px 0 var(--panel-hover-inset) !important;
+}
+
+/* Widget palette ownership must win over stat-card and status color rules. */
+.widget-layout > .widget-card.db-panel-custom-color,
+.widget-layout > .widget-card.db-panel-custom-color.stat-danger,
+.widget-layout > .widget-card.db-panel-custom-color.stat-warn,
+.widget-layout > .widget-card.db-panel-custom-color.stat-purple,
+.widget-layout > .widget-card.db-panel-custom-color.xym-red,
+.widget-layout > .widget-card.db-panel-custom-color.xym-yellow,
+.widget-layout > .widget-card.db-panel-custom-color.xym-purple,
+.widget-layout > .widget-card.db-panel-custom-color.xym-green {
+  --panel-lock-bg: color-mix(in srgb, var(--surface-raised) 62%, var(--panel-accent) 38%);
+  --panel-lock-fg: var(--panel-accent-text);
+  --panel-lock-border: rgba(var(--panel-accent-rgb), .54);
+  --panel-lock-glow: rgba(var(--panel-accent-rgb), .24);
+  --panel-drawer-bg: rgba(var(--panel-accent-rgb), .24);
+  background: linear-gradient(90deg, rgba(var(--panel-accent-rgb), .54), rgba(var(--panel-accent-rgb), .30));
+  border-color: color-mix(in srgb, var(--panel-accent) 62%, white) !important;
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px rgba(var(--panel-accent-rgb), .10) !important;
+}
+
+.widget-layout > .widget-card.db-panel-custom-color:hover,
+.widget-layout > .widget-card.db-panel-custom-color.active {
+  background: linear-gradient(90deg, rgba(var(--panel-accent-rgb), .58), rgba(var(--panel-accent-rgb), .34));
+  border-color: color-mix(in srgb, var(--panel-accent) 78%, var(--panel-hover-tint)) !important;
+  box-shadow:
+    0 14px 30px rgba(15, 23, 42, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .22) !important;
+}
+
+.widget-layout > .widget-card.db-panel-custom-color.active {
+  outline: 3px solid color-mix(in srgb, var(--panel-accent) 82%, var(--panel-hover-tint));
+  outline-offset: 0;
+  border-color: color-mix(in srgb, var(--panel-accent) 88%, var(--panel-hover-tint)) !important;
+  box-shadow:
+    0 16px 34px rgba(15, 23, 42, .18),
+    0 10px 24px rgba(var(--panel-accent-rgb), .16) !important;
+}
+
+.widget-layout > .widget-card.db-panel-custom-color.active:hover {
+  outline-color: color-mix(in srgb, var(--panel-accent) 92%, var(--panel-hover-tint));
+  box-shadow:
+    0 18px 38px rgba(15, 23, 42, .22),
+    0 12px 28px rgba(var(--panel-accent-rgb), .18) !important;
+}
+
+.widget-layout > .widget-card.db-panel-custom-color:hover .stat-val,
+.widget-layout > .widget-card.db-panel-custom-color:hover .stat-lbl,
+.widget-layout > .widget-card.db-panel-custom-color.active .stat-val,
+.widget-layout > .widget-card.db-panel-custom-color.active .stat-lbl {
+  color: var(--panel-accent-text) !important;
+}
+
+.widget-layout > .widget-card.db-panel-custom-color .stat-val,
+.widget-layout > .widget-card.db-panel-custom-color .stat-lbl {
+  color: var(--panel-accent-text) !important;
+}
+
+.widget-card.db-panel-custom-color .panel-settings-toggle,
+.widget-card.db-panel-custom-color .panel-tool-button {
+  --panel-lock-bg: color-mix(in srgb, var(--surface-raised) 62%, var(--panel-accent) 38%) !important;
+  --panel-lock-fg: var(--panel-accent-text) !important;
+  --panel-lock-border: rgba(var(--panel-accent-rgb), .54) !important;
+  --panel-lock-glow: rgba(var(--panel-accent-rgb), .24) !important;
+  --panel-drawer-bg: rgba(var(--panel-accent-rgb), .24) !important;
+  border-color: rgba(var(--panel-accent-rgb), .54);
+  box-shadow:
+    0 10px 24px rgba(var(--panel-accent-rgb), .24),
+    0 0 18px rgba(var(--panel-accent-rgb), .16),
+    inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+
+.widget-card.db-panel-custom-color .widget-tool-drawer {
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--panel-accent) 8%);
+  border-color: rgba(var(--panel-accent-rgb), .46);
+  box-shadow:
+    0 14px 32px rgba(15, 23, 42, .18),
+    0 0 18px rgba(var(--panel-accent-rgb), .16);
+}
+
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-danger,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-warn,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-purple,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-red,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-yellow,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-purple,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-green {
+  background: color-mix(in srgb, #122033 72%, var(--panel-accent) 28%);
+  border-color: color-mix(in srgb, var(--panel-accent) 62%, #40536e);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--panel-accent) 18%, transparent), 0 1px 0 rgba(255, 255, 255, .08) inset;
+}
+
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color:hover,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.active {
+  background: color-mix(in srgb, #122033 62%, var(--panel-accent) 38%);
+  border-color: color-mix(in srgb, var(--panel-accent) 78%, var(--panel-hover-tint));
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+
+/* Dark mode polish: keep the light-mode softness without the heavy saturation. */
+html[data-theme="dark"] body {
+  background: #0b1220;
+}
+
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .db-panel {
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, .28),
+    0 1px 0 rgba(255, 255, 255, .055) inset,
+    0 0 0 1px rgba(148, 190, 255, .08);
+}
+
+html[data-theme="dark"] .stat-card:hover {
+  border-color: rgba(147, 197, 253, .66);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, .30),
+    0 0 0 1px rgba(147, 197, 253, .18),
+    0 0 18px rgba(103, 169, 255, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+
+html[data-theme="dark"] .widget-layout > .stat-card:hover {
+  border-color: rgba(164, 205, 255, .74);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+
+html[data-theme="dark"] .widget-layout > .stat-card.active:hover {
+  border-color: rgba(191, 219, 254, .86);
+  outline-color: rgba(191, 219, 254, .92);
+  box-shadow:
+    inset 0 0 0 1px rgba(147, 197, 253, .30),
+    0 16px 34px rgba(0, 0, 0, .36);
+}
+
+html[data-theme="dark"] .stat-card.active {
+  outline: 3px solid rgba(164, 205, 255, .86);
+  outline-offset: 0;
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, .34),
+    0 10px 24px rgba(103, 169, 255, .14);
+}
+
+html[data-theme="dark"] .stat-card:hover .stat-val,
+html[data-theme="dark"] .stat-card:hover .stat-lbl,
+html[data-theme="dark"] .stat-card.active .stat-val,
+html[data-theme="dark"] .stat-card.active .stat-lbl {
+  color: #f8fbff;
+}
+
+html[data-theme="dark"] .db-panel.db-panel-custom-color,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-danger,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-warn,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-purple,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-red,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-yellow,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-purple,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-green {
+  border-color: color-mix(in srgb, var(--panel-accent) 52%, #dbeafe) !important;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, .28),
+    0 1px 0 rgba(255, 255, 255, .06) inset,
+    0 0 0 1px rgba(var(--panel-accent-rgb), .22),
+    0 0 18px rgba(var(--panel-accent-rgb), .10) !important;
+}
+
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-danger,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-warn,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.stat-purple,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-red,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-yellow,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-purple,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.xym-green,
+html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd {
+  --panel-header-control-bg: color-mix(in srgb, #172235 46%, var(--panel-accent) 54%) !important;
+  --panel-header-control-border: color-mix(in srgb, var(--panel-accent) 48%, #dbeafe) !important;
+  --panel-header-control-glow: rgba(var(--panel-accent-rgb), .18) !important;
+  --panel-lock-bg: color-mix(in srgb, #172235 52%, var(--panel-accent) 48%) !important;
+  --panel-lock-border: rgba(var(--panel-accent-rgb), .46) !important;
+  --panel-lock-glow: rgba(var(--panel-accent-rgb), .18) !important;
+  background: linear-gradient(90deg, rgba(var(--panel-accent-rgb), .44), rgba(var(--panel-accent-rgb), .28)) !important;
+}
+
+html[data-theme="dark"] .db-panel.db-panel-custom-color:hover,
+html[data-theme="dark"] .db-panel.db-panel-custom-color:focus-within,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color:hover,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.active {
+  border-color: color-mix(in srgb, var(--panel-accent) 66%, #f8fbff) !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, .30),
+    0 1px 0 rgba(255, 255, 255, .07) inset !important;
+}
+
+html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd:hover,
+html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd:focus-visible,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color:hover,
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.active {
+  background: linear-gradient(90deg, rgba(var(--panel-accent-rgb), .50), rgba(var(--panel-accent-rgb), .32)) !important;
+}
+
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.active {
+  outline: 3px solid color-mix(in srgb, var(--panel-accent) 78%, #f8fbff);
+  outline-offset: 0;
+  border-color: color-mix(in srgb, var(--panel-accent) 82%, #f8fbff) !important;
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, .36),
+    0 10px 24px rgba(var(--panel-accent-rgb), .14) !important;
+}
+
+html[data-theme="dark"] .widget-layout > .widget-card.db-panel-custom-color.active:hover {
+  outline-color: color-mix(in srgb, var(--panel-accent) 88%, #f8fbff);
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, .40),
+    0 12px 28px rgba(var(--panel-accent-rgb), .16) !important;
+}
+
+html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd::before,
+html[data-theme="dark"] .db-panel.db-panel-custom-color > .db-panel-hd .db-panel-count,
+html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-lock-toggle,
+html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-pin-toggle,
+html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-settings-toggle,
+html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-button,
+html[data-theme="dark"] .widget-card.db-panel-custom-color .panel-settings-toggle,
+html[data-theme="dark"] .widget-card.db-panel-custom-color .panel-tool-button {
+  box-shadow:
+    0 8px 18px rgba(var(--panel-accent-rgb), .16),
+    inset 0 1px 0 rgba(255, 255, 255, .16) !important;
+}
+
+html[data-theme="dark"] .panel-tool-drawer,
+html[data-theme="dark"] .widget-tool-drawer,
+html[data-theme="dark"] .db-panel.db-panel-custom-color .panel-tool-drawer,
+html[data-theme="dark"] .widget-card.db-panel-custom-color .widget-tool-drawer {
+  background: color-mix(in srgb, #101827 88%, var(--panel-accent, #67a9ff) 12%) !important;
+  border-color: rgba(var(--panel-accent-rgb, 103, 169, 255), .42) !important;
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, .32),
+    0 0 18px rgba(var(--panel-accent-rgb, 103, 169, 255), .12),
+    inset 0 1px 0 rgba(255, 255, 255, .07) !important;
+}
+
+/* Dashboard top bar polish: match the soft widget/panel control language. */
+.app-nav:not(.settings-nav) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 74px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1.5px solid color-mix(in srgb, var(--line) 78%, white);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, white);
+  box-shadow:
+    0 16px 34px rgba(15, 23, 42, .10),
+    0 1px 0 rgba(255, 255, 255, .76) inset;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-nav:not(.settings-nav) > .app-nav-brand-group,
+.app-nav:not(.settings-nav) > .app-nav-status,
+.app-nav:not(.settings-nav) > .app-nav-actions {
+  order: initial;
+  margin: 0;
+}
+
+.app-nav:not(.settings-nav) > .app-nav-brand-group {
+  flex: 0 0 auto;
+}
+
+.app-nav:not(.settings-nav) > .app-nav-status {
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  position: static;
+}
+
+.app-nav:not(.settings-nav) > .app-nav-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-nav:not(.settings-nav) .layout-slot-controls {
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-soft) 72%, white);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, .045);
+}
+
+.app-nav:not(.settings-nav) button.dash-switch-hero {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 16px;
+  font-size: 15px;
+  letter-spacing: 0 !important;
+  box-shadow:
+    0 10px 24px rgba(37, 99, 235, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .26);
+}
+
+.app-nav:not(.settings-nav) .dash-switch-hero .dash-switch-arrow {
+  width: 20px;
+  height: 20px;
+}
+
+.app-nav:not(.settings-nav) .theme-toggle,
+.app-nav:not(.settings-nav) .panel-reset-button,
+.app-nav:not(.settings-nav) .panel-undo-button,
+.app-nav:not(.settings-nav) .panel-add-button,
+.app-nav:not(.settings-nav) .layout-slot-button,
+.app-nav:not(.settings-nav) .layout-slot-trigger,
+.app-nav:not(.settings-nav) .nav-status-icon-only,
+.app-nav:not(.settings-nav) .cmd-btn-icon-only {
+  height: 38px;
+  min-height: 38px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, .07),
+    0 1px 0 rgba(255, 255, 255, .72) inset;
+}
+
+.app-nav:not(.settings-nav) .layout-slot-trigger {
+  min-width: 96px;
+  padding: 0 28px 0 13px;
+  color: var(--ink-strong);
+}
+
+.app-nav:not(.settings-nav) .layout-slot-button,
+.app-nav:not(.settings-nav) .panel-reset-button,
+.app-nav:not(.settings-nav) .panel-undo-button {
+  min-width: 58px;
+  padding: 0 12px;
+}
+
+.app-nav:not(.settings-nav) .panel-add-button,
+.app-nav:not(.settings-nav) .nav-status-icon-only,
+.app-nav:not(.settings-nav) .cmd-btn-icon-only {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+}
+
+.app-nav:not(.settings-nav) .theme-toggle {
+  width: 58px;
+  min-width: 58px;
+  padding: 0 6px;
+}
+
+.app-nav:not(.settings-nav) .nav-status-icon-only .nav-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 9px;
+}
+
+.app-nav:not(.settings-nav) .cmd-btn-icon-only {
+  border-color: color-mix(in srgb, var(--blue) 36%, var(--line-soft));
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  box-shadow:
+    0 10px 22px rgba(37, 99, 235, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .24);
+}
+
+.app-nav:not(.settings-nav) .cmd-btn-danger {
+  border-color: color-mix(in srgb, var(--red) 44%, #fecaca);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  box-shadow:
+    0 10px 22px rgba(220, 38, 38, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .22);
+}
+
+.app-nav:not(.settings-nav) .layout-slot-menu,
+.app-nav:not(.settings-nav) .panel-add-menu,
+.app-nav:not(.settings-nav) .dash-switch-menu,
+.app-nav:not(.settings-nav) .nav-status-popover {
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-raised);
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, .16),
+    0 1px 0 rgba(255, 255, 255, .72) inset;
+}
+
+.app-nav:not(.settings-nav) .nav-status-menu {
+  position: relative;
+}
+
+.app-nav:not(.settings-nav) .nav-status-popover {
+  top: calc(100% + 8px);
+  left: 0;
+  right: auto;
+  transform: translate(0, -6px) scale(.94);
+  transform-origin: top left;
+}
+
+.app-nav:not(.settings-nav) .nav-status-menu.is-open .nav-status-popover {
+  transform: translate(0, 0) scale(1);
+}
+
+.app-nav:not(.settings-nav) .panel-add-menu {
+  gap: 8px;
+  min-width: 142px;
+  padding: 10px;
+}
+
+.app-nav:not(.settings-nav) .panel-add-action,
+.app-nav:not(.settings-nav) .widget-add-action {
+  min-height: 36px;
+  border-radius: 12px;
+}
+
+.app-nav:not(.settings-nav) .theme-toggle:hover,
+.app-nav:not(.settings-nav) .panel-reset-button:hover,
+.app-nav:not(.settings-nav) .panel-undo-button:hover,
+.app-nav:not(.settings-nav) .panel-add-button:hover,
+.app-nav:not(.settings-nav) .layout-slot-button:hover,
+.app-nav:not(.settings-nav) .layout-slot-trigger:hover,
+.app-nav:not(.settings-nav) .nav-status-icon-only:hover {
+  transform: translateY(-1px);
+  border-color: #93c5fd;
+  background: #f7fbff;
+  box-shadow:
+    0 10px 22px rgba(37, 99, 235, .12),
+    0 1px 0 rgba(255, 255, 255, .76) inset;
+}
+
+.app-nav:not(.settings-nav) .cmd-btn-icon-only:hover,
+.app-nav:not(.settings-nav) .cmd-btn-icon-only:focus-visible {
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 26px rgba(37, 99, 235, .28),
+    inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+.app-nav:not(.settings-nav) .cmd-btn-danger:hover,
+.app-nav:not(.settings-nav) .cmd-btn-danger:focus-visible {
+  box-shadow:
+    0 12px 26px rgba(220, 38, 38, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+
+html[data-theme="dark"] .app-nav:not(.settings-nav) {
+  border-color: #354864;
+  background: color-mix(in srgb, #101827 88%, #172235);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, .32),
+    0 1px 0 rgba(255, 255, 255, .055) inset,
+    0 0 0 1px rgba(148, 190, 255, .06);
+}
+
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-slot-controls {
+  border-color: #2d405b;
+  background: color-mix(in srgb, #111a2a 82%, #172235);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+}
+
+html[data-theme="dark"] .app-nav:not(.settings-nav) .theme-toggle,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-reset-button,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-undo-button,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-add-button,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-slot-button,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-slot-trigger,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .nav-status-icon-only {
+  border-color: #40536e;
+  background: #172235;
+  color: #dbe8f8;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, .24),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-slot-menu,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-add-menu,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .dash-switch-menu,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .nav-status-popover {
+  border-color: #40536e;
+  background: #111a2a;
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, .42),
+    0 1px 0 rgba(255, 255, 255, .055) inset;
+}
+
+html[data-theme="dark"] .app-nav:not(.settings-nav) .theme-toggle:hover,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-reset-button:hover,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-undo-button:hover,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .panel-add-button:hover,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-slot-button:hover,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-slot-trigger:hover,
+html[data-theme="dark"] .app-nav:not(.settings-nav) .nav-status-icon-only:hover {
+  border-color: rgba(147, 197, 253, .72);
+  background: #1b2d47;
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, .28),
+    inset 0 1px 0 rgba(255, 255, 255, .075);
+}
+
+@media (max-width: 980px) {
+  .app-nav:not(.settings-nav) {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .app-nav:not(.settings-nav) > .app-nav-status {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
+.db-panel.db-panel-tools-open > .db-panel-hd,
+html[data-theme="dark"] .db-panel.db-panel-tools-open > .db-panel-hd {
+  border-radius: 14.5px 14.5px 0 0 !important;
+  background-clip: padding-box !important;
+}
+
+.db-panel.db-panel-collapsed.db-panel-tools-open > .db-panel-hd,
+html[data-theme="dark"] .db-panel.db-panel-collapsed.db-panel-tools-open > .db-panel-hd {
+  border-radius: 14.5px !important;
+}
+
+.db-panel.db-panel-tools-open > .db-panel-hd:hover,
+.db-panel.db-panel-tools-open > .db-panel-hd:focus-visible,
+html[data-theme="dark"] .db-panel.db-panel-tools-open > .db-panel-hd:hover,
+html[data-theme="dark"] .db-panel.db-panel-tools-open > .db-panel-hd:focus-visible {
+  box-shadow: none !important;
+  outline-offset: -3px;
+}
+
+.db-panel.db-panel-tools-open:hover,
+.db-panel.db-panel-tools-open:focus-within,
+html[data-theme="dark"] .db-panel.db-panel-tools-open:hover,
+html[data-theme="dark"] .db-panel.db-panel-tools-open:focus-within,
+.db-panel.db-panel-custom-color.db-panel-tools-open:hover,
+.db-panel.db-panel-custom-color.db-panel-tools-open:focus-within,
+html[data-theme="dark"] .db-panel.db-panel-custom-color.db-panel-tools-open:hover,
+html[data-theme="dark"] .db-panel.db-panel-custom-color.db-panel-tools-open:focus-within {
+  transform: none !important;
+  box-shadow: var(--shadow-card) !important;
 }
 
 @media (max-width: 980px) {
