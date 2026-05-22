@@ -1428,6 +1428,36 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       return null;
     };
+    const findNearestAvailableSlot = (bounds, preferred = bounds) => {
+      const maxCol = Math.max(1, DASHBOARD_GRID_COLUMNS - bounds.span + 1);
+      const preferredCol = Math.max(1, Math.min(maxCol, Math.round(Number(preferred.col) || bounds.col)));
+      const preferredRow = Math.max(1, Math.round(Number(preferred.row) || bounds.row));
+      const rowLimit = Math.max(
+        preferredRow + 24,
+        bounds.row + 24,
+        ...sortedItems.map((entry) => entry.bounds.bottom + 8),
+        ...activeBounds.map((entry) => entry.bottom + 8),
+      );
+      let best = null;
+      for (let row = 1; row <= rowLimit; row += 1) {
+        for (let col = 1; col <= maxCol; col += 1) {
+          const candidate = boundsAt(bounds, col, row);
+          if (!canOccupy(candidate)) continue;
+          const distance = (Math.abs(row - preferredRow) * DASHBOARD_GRID_COLUMNS) + Math.abs(col - preferredCol);
+          const beforePreferred = row < preferredRow || (row === preferredRow && col < preferredCol);
+          const score = distance + (beforePreferred ? 0.25 : 0);
+          if (
+            !best ||
+            score < best.score ||
+            (score === best.score && row < best.bounds.row) ||
+            (score === best.score && row === best.bounds.row && col < best.bounds.col)
+          ) {
+            best = { bounds: candidate, score };
+          }
+        }
+      }
+      return best?.bounds || null;
+    };
 
     [...activeSet].map(gridBoundsForItem).forEach(occupy);
 
@@ -1448,7 +1478,8 @@ document.addEventListener("DOMContentLoaded", () => {
       : null;
 
     if (swapCandidate) {
-      const swapBounds = findAvailableSlotFrom(swapCandidate.bounds, originBounds.col, originBounds.row);
+      const swapBounds = findNearestAvailableSlot(swapCandidate.bounds, originBounds) ||
+        findAvailableSlotFrom(swapCandidate.bounds, originBounds.col, originBounds.row);
       if (swapBounds) {
         applyGridItemPosition(swapCandidate.item, swapBounds.col, swapBounds.row);
         occupy(swapBounds);
@@ -1461,15 +1492,17 @@ document.addEventListener("DOMContentLoaded", () => {
         occupy(bounds);
         return;
       }
-      let next = nextGridSlot(bounds);
-      for (let attempts = 0; attempts < 120; attempts += 1) {
-        const nextBounds = boundsAt(bounds, next.col, next.row);
-        if (canOccupy(nextBounds)) {
-          applyGridItemPosition(item, next.col, next.row);
-          occupy(nextBounds);
-          return;
-        }
-        next = nextGridSlot(nextBounds);
+      const nearestBounds = findNearestAvailableSlot(bounds);
+      if (nearestBounds) {
+        applyGridItemPosition(item, nearestBounds.col, nearestBounds.row);
+        occupy(nearestBounds);
+        return;
+      }
+      const next = nextGridSlot(bounds);
+      const shiftedBounds = findAvailableSlotFrom(bounds, next.col, next.row);
+      if (shiftedBounds) {
+        applyGridItemPosition(item, shiftedBounds.col, shiftedBounds.row);
+        occupy(shiftedBounds);
       }
     });
   };
