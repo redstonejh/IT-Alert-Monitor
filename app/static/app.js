@@ -1413,6 +1413,15 @@ document.addEventListener("DOMContentLoaded", () => {
       right: col + bounds.span - 1,
       bottom: row + bounds.rowSpan - 1,
     });
+    const findAvailableSlotFrom = (bounds, col, row) => {
+      let nextBounds = boundsAt(bounds, col, row);
+      for (let attempts = 0; attempts < 120; attempts += 1) {
+        if (canOccupy(nextBounds)) return nextBounds;
+        const next = nextGridSlot(nextBounds);
+        nextBounds = boundsAt(bounds, next.col, next.row);
+      }
+      return null;
+    };
 
     [...activeSet].map(gridBoundsForItem).forEach(occupy);
 
@@ -1427,16 +1436,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const activeBounds = [...activeSet].map(gridBoundsForItem);
     const primaryActive = [...activeSet][0];
-    const movingUp = Boolean(origin && target && target.row < origin.row && primaryActive);
-    const originBounds = movingUp ? boundsAt(gridBoundsForItem(primaryActive), origin.col, origin.row) : null;
+    const originBounds = origin && primaryActive ? boundsAt(gridBoundsForItem(primaryActive), origin.col, origin.row) : null;
     const swapCandidate = originBounds
       ? sortedItems.find(({ bounds }) => activeBounds.some((active) => gridBoundsOverlap(bounds, active)))
       : null;
 
-    if (swapCandidate && canOccupy(originBounds)) {
-      applyGridItemPosition(swapCandidate.item, originBounds.col, originBounds.row);
-      occupy(originBounds);
-      sortedItems.splice(sortedItems.indexOf(swapCandidate), 1);
+    if (swapCandidate) {
+      const swapBounds = findAvailableSlotFrom(swapCandidate.bounds, originBounds.col, originBounds.row);
+      if (swapBounds) {
+        applyGridItemPosition(swapCandidate.item, swapBounds.col, swapBounds.row);
+        occupy(swapBounds);
+        sortedItems.splice(sortedItems.indexOf(swapCandidate), 1);
+      }
     }
 
     sortedItems.forEach(({ item, bounds }) => {
