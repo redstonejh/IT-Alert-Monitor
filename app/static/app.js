@@ -1443,6 +1443,7 @@ document.addEventListener("DOMContentLoaded", () => {
         for (let col = 1; col <= maxCol; col += 1) {
           const candidate = boundsAt(bounds, col, row);
           if (!canOccupy(candidate)) continue;
+          if (options.forwardOnly && (row < bounds.row || (row === bounds.row && col < bounds.col))) continue;
           const distance = (Math.abs(row - preferredRow) * DASHBOARD_GRID_COLUMNS) + Math.abs(col - preferredCol);
           const beforePreferred = row < preferredRow || (row === preferredRow && col < preferredCol);
           const score = distance + (beforePreferred ? 0.25 : 0);
@@ -2366,7 +2367,7 @@ document.addEventListener("DOMContentLoaded", () => {
               if (panel.dataset.gridCol && panel.dataset.gridRow) applyPanelGridPosition(panel, panel.dataset.gridCol, panel.dataset.gridRow);
             }
           } else {
-            applyLocalCollisionLayout(layout, panel);
+            applyLocalCollisionLayout(layout, panel, { forwardOnly: true });
           }
         }, panel);
         header.setAttribute("aria-expanded", (!collapsed).toString());
