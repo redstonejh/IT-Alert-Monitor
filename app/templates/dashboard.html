@@ -47,6 +47,8 @@
     </div>
     <button class="panel-reset-button" type="button" data-layout-target="eset" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
     <button class="panel-undo-button" type="button" data-layout-target="eset" aria-label="Undo last layout change" title="Undo last layout change">Undo</button>
+    <button class="layout-slot-button layout-group-button" type="button" data-layout-target="eset" aria-pressed="false" title="Select widgets or panels as a group">Group</button>
+    <button class="layout-slot-button layout-normalize-button" type="button" data-layout-target="eset" title="Normalize selected group size">Normalize</button>
     <details class="nav-status-menu">
       <summary class="nav-status-item nav-status-icon-only {% if config.mailbox_address or config.oauth_account %}nav-status-good{% else %}nav-status-bad{% endif %}" aria-label="{% if config.mailbox_address or config.oauth_account %}Mailbox connected: {{ config.mailbox_address or config.oauth_account }}{% else %}Mailbox not connected{% endif %}" title="{% if config.mailbox_address or config.oauth_account %}Mailbox connected: {{ config.mailbox_address or config.oauth_account }}{% else %}Mailbox not connected{% endif %}">
         <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>

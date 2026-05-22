@@ -370,6 +370,50 @@ document.addEventListener("DOMContentLoaded", () => {
     const hasOpenTools = Boolean(document.querySelector(".db-panel-tools-open, .widget-tools-open"));
     document.body.classList.toggle("layout-tools-active", hasOpenTools);
   };
+  let groupMode = false;
+  const groupSelection = new Set();
+  const groupItemKind = (item) => item?.classList?.contains("widget-card") ? "widget" : "panel";
+  const groupItemLayout = (item) => item?.closest?.(".widget-layout, .panel-layout");
+  const groupItemLayoutKey = (item) => {
+    const layout = groupItemLayout(item);
+    return layout?.dataset.widgetLayoutKey || layout?.dataset.layoutKey || "default";
+  };
+  const selectedGroupItems = (kind, layoutKey) => [...groupSelection].filter((item) => {
+    if (!item?.isConnected || item.hidden) return false;
+    if (kind && groupItemKind(item) !== kind) return false;
+    if (layoutKey && groupItemLayoutKey(item) !== layoutKey) return false;
+    return true;
+  });
+  const clearGroupSelection = () => {
+    groupSelection.forEach((item) => item.classList.remove("group-selected"));
+    groupSelection.clear();
+  };
+  const syncGroupButtons = () => {
+    document.body.classList.toggle("group-select-active", groupMode);
+    document.querySelectorAll(".layout-group-button").forEach((button) => {
+      button.setAttribute("aria-pressed", groupMode.toString());
+    });
+  };
+  const setGroupMode = (enabled) => {
+    groupMode = Boolean(enabled);
+    if (!groupMode) clearGroupSelection();
+    syncGroupButtons();
+  };
+  const toggleGroupItem = (item) => {
+    if (!item) return;
+    if (groupSelection.has(item)) {
+      groupSelection.delete(item);
+      item.classList.remove("group-selected");
+    } else {
+      groupSelection.add(item);
+      item.classList.add("group-selected");
+    }
+  };
+  const groupPeers = (source, kind = groupItemKind(source)) => {
+    if (!source?.classList?.contains("group-selected")) return [];
+    const layoutKey = groupItemLayoutKey(source);
+    return selectedGroupItems(kind, layoutKey).filter((item) => item !== source);
+  };
   const liveLayoutUndo = new Map();
   const liveLayoutUndoKey = (layoutKey, profile = getActivePanelProfile(layoutKey)) => `${profile}:${layoutKey}`;
   const serializeLayoutElement = (element, keyName) => ({
@@ -465,14 +509,17 @@ document.addEventListener("DOMContentLoaded", () => {
     pendingPanelDelete = null;
     panelDeleteDialog?.close();
   };
-  const requestPanelDelete = ({ panel, layout, layoutKey, title }) => {
-    pendingPanelDelete = { panel, layout, layoutKey, title };
+  const requestPanelDelete = ({ panel, layout, layoutKey, title, panels = null }) => {
+    const targets = panels?.length ? panels : [panel];
+    pendingPanelDelete = { panel, panels: targets, layout, layoutKey, title };
     if (panelDeleteMessage) {
-      panelDeleteMessage.textContent = `Are you sure you want to delete "${title} panel"?`;
+      panelDeleteMessage.textContent = targets.length > 1
+        ? `Are you sure you want to delete ${targets.length} selected panels?`
+        : `Are you sure you want to delete "${title} panel"?`;
     }
     if (typeof panelDeleteDialog?.showModal === "function") {
       panelDeleteDialog.showModal();
-    } else if (window.confirm(`Are you sure you want to delete "${title} panel"?`)) {
+    } else if (window.confirm(targets.length > 1 ? `Are you sure you want to delete ${targets.length} selected panels?` : `Are you sure you want to delete "${title} panel"?`)) {
       panelDeleteConfirm?.click();
     }
   };
@@ -484,20 +531,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   panelDeleteConfirm?.addEventListener("click", () => {
     if (!pendingPanelDelete) return;
-    const { panel, layout, layoutKey, title } = pendingPanelDelete;
-    if (!panel.dataset.customPanel) {
-      const hidden = readDraftList(layout, "hiddenPanelsDraft");
-      if (!hidden.includes(panel.dataset.panelKey)) hidden.push(panel.dataset.panelKey);
-      writeDraftList(layout, "hiddenPanelsDraft", hidden);
-    }
-    if (panel.dataset.customPanel) {
-      panel.remove();
-    } else {
-      panel.hidden = true;
-    }
+    const { panels, layout, title } = pendingPanelDelete;
+    const targets = panels?.length ? panels : [pendingPanelDelete.panel];
+    const hidden = readDraftList(layout, "hiddenPanelsDraft");
+    targets.forEach((target) => {
+      if (!target.dataset.customPanel && !hidden.includes(target.dataset.panelKey)) hidden.push(target.dataset.panelKey);
+      groupSelection.delete(target);
+      target.classList.remove("group-selected");
+      if (target.dataset.customPanel) {
+        target.remove();
+      } else {
+        target.hidden = true;
+      }
+    });
+    if (targets.some((target) => !target.dataset.customPanel)) writeDraftList(layout, "hiddenPanelsDraft", hidden);
     cleanupPanelRowBreaks(layout);
     savePanelLayouts(layout);
-    showToast(`${title} panel deleted.`);
+    showToast(targets.length > 1 ? `${targets.length} panels deleted.` : `${title} panel deleted.`);
     closePanelDeleteDialog();
   });
   const getPanelMinimumWidth = (panel) => {
@@ -748,6 +798,17 @@ document.addEventListener("DOMContentLoaded", () => {
           event.preventDefault();
           event.stopPropagation();
           onSelect(color);
+          if (panel.classList.contains("group-selected")) {
+            const peers = selectedGroupItems(null, groupItemLayoutKey(panel)).filter((item) => item !== panel);
+            peers.forEach((item) => applyPanelColor(item, color));
+            [...new Set(peers.map(groupItemLayout).filter(Boolean))].forEach((peerLayout) => {
+              if (peerLayout.classList.contains("widget-layout")) {
+                saveWidgetLayouts(peerLayout);
+              } else {
+                savePanelLayouts(peerLayout);
+              }
+            });
+          }
           syncPanelThemeVars(panel, menu);
           if (typeof panel.__saveWidgetLayout === "function") {
             panel.__saveWidgetLayout();
@@ -1022,6 +1083,10 @@ document.addEventListener("DOMContentLoaded", () => {
         event.stopPropagation();
         const pinned = widget.classList.toggle("db-panel-pinned");
         pinButton.setAttribute("aria-pressed", pinned.toString());
+        groupPeers(widget, "widget").forEach((peer) => {
+          peer.classList.toggle("db-panel-pinned", pinned);
+          peer.querySelector(".panel-pin-toggle")?.setAttribute("aria-pressed", pinned.toString());
+        });
         saveWidgetLayouts(layout);
       });
       titleButton?.addEventListener("click", (event) => {
@@ -1059,16 +1124,23 @@ document.addEventListener("DOMContentLoaded", () => {
       deleteButton?.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const key = widget.dataset.widgetKey;
-        if (!widget.dataset.customWidget) {
-          const hidden = readDraftList(layout, "hiddenWidgetsDraft");
-          if (!hidden.includes(key)) hidden.push(key);
+        const targets = [widget, ...groupPeers(widget, "widget").filter((peer) => groupItemLayout(peer) === layout)];
+        const hidden = readDraftList(layout, "hiddenWidgetsDraft");
+        targets.forEach((target) => {
+          const key = target.dataset.widgetKey;
+          if (!target.dataset.customWidget && !hidden.includes(key)) {
+            hidden.push(key);
+          }
+          groupSelection.delete(target);
+          target.classList.remove("group-selected");
+          if (target.dataset.customWidget) {
+            target.remove();
+          } else {
+            target.hidden = true;
+          }
+        });
+        if (targets.some((target) => !target.dataset.customWidget)) {
           writeDraftList(layout, "hiddenWidgetsDraft", hidden);
-        }
-        if (widget.dataset.customWidget) {
-          widget.remove();
-        } else {
-          widget.hidden = true;
         }
         saveWidgetLayouts(layout);
       });
@@ -1087,6 +1159,9 @@ document.addEventListener("DOMContentLoaded", () => {
         let offsetY = 0;
         let lastPlaceholderMove = 0;
         const startWidgets = [...layout.querySelectorAll(":scope > .widget-card")];
+        const movePeers = groupPeers(widget, "widget")
+          .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
+          .sort((a, b) => startWidgets.indexOf(a) - startWidgets.indexOf(b));
         const startIndex = startWidgets.indexOf(widget);
         const pinnedBefore = startWidgets
           .slice(0, Math.max(0, startIndex))
@@ -1099,6 +1174,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const childIndex = (item) => [...layout.children].indexOf(item);
         const isInsidePinnedSegment = (item) => {
           if (!item || item === widget) return false;
+          if (movePeers.includes(item)) return false;
           if (item === placeholder) return true;
           if (item.classList.contains("db-panel-pinned")) return false;
           const itemIndex = childIndex(item);
@@ -1235,6 +1311,7 @@ document.addEventListener("DOMContentLoaded", () => {
             widget.style.top = "";
             widget.style.width = "";
             layout.insertBefore(widget, placeholder);
+            movePeers.forEach((peer) => layout.insertBefore(peer, placeholder));
             placeholder.remove();
             saveWidgetLayouts(layout);
           }
@@ -1255,20 +1332,31 @@ document.addEventListener("DOMContentLoaded", () => {
         window.getSelection?.()?.removeAllRanges();
         const layoutWidth = Math.max(1, layout.getBoundingClientRect().width);
         const startSpan = Number(widget.dataset.currentSpan) || 3;
+        const resizePeers = groupPeers(widget, "widget")
+          .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
+          .map((peer) => ({ peer, startSpan: Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 3 }));
         const startX = event.clientX;
         let lastAnimatedSpan = startSpan;
+        const applyResize = (nextSpan) => {
+          const delta = nextSpan - startSpan;
+          applyWidgetSpan(widget, nextSpan);
+          resizePeers.forEach(({ peer, startSpan: peerStartSpan }) => applyWidgetSpan(peer, peerStartSpan + delta));
+        };
         const onMove = (moveEvent) => {
           const nextSpan = Math.max(2, Math.min(12, startSpan + (((moveEvent.clientX - startX) / layoutWidth) * 12)));
           if (Math.abs(nextSpan - lastAnimatedSpan) >= .35) {
-            animateWidgetReflow(layout, () => applyWidgetSpan(widget, nextSpan), widget);
+            animateWidgetReflow(layout, () => applyResize(nextSpan), widget);
             lastAnimatedSpan = nextSpan;
           } else {
-            applyWidgetSpan(widget, nextSpan);
+            applyResize(nextSpan);
           }
         };
         const onUp = () => {
           document.body.classList.remove("panel-interaction-active");
-          animateWidgetReflow(layout, () => applyWidgetSpan(widget, Math.round(Number(widget.dataset.currentSpan) || startSpan)), widget);
+          animateWidgetReflow(layout, () => {
+            applyWidgetSpan(widget, Math.round(Number(widget.dataset.currentSpan) || startSpan));
+            resizePeers.forEach(({ peer }) => applyWidgetSpan(peer, Math.round(Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 3)));
+          }, widget);
           saveWidgetLayouts(layout);
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
@@ -1447,6 +1535,10 @@ document.addEventListener("DOMContentLoaded", () => {
         event.stopPropagation();
         const pinned = panel.classList.toggle("db-panel-pinned");
         pinButton.setAttribute("aria-pressed", pinned.toString());
+        groupPeers(panel, "panel").forEach((peer) => {
+          peer.classList.toggle("db-panel-pinned", pinned);
+          peer.querySelector(".panel-pin-toggle")?.setAttribute("aria-pressed", pinned.toString());
+        });
         savePanelLayouts(layout);
       });
 
@@ -1502,7 +1594,8 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         event.stopPropagation();
         const title = panel.dataset.panelTitle || panel.querySelector(".db-panel-title")?.textContent?.trim() || "this";
-        requestPanelDelete({ panel, layout, layoutKey, title });
+        const targets = [panel, ...groupPeers(panel, "panel").filter((peer) => groupItemLayout(peer) === layout)];
+        requestPanelDelete({ panel, panels: targets, layout, layoutKey, title });
       });
 
       header.setAttribute("role", "button");
@@ -1552,6 +1645,9 @@ document.addEventListener("DOMContentLoaded", () => {
         let dragged = false;
         let lastPlaceholderMove = 0;
         const startPanels = [...layout.querySelectorAll(":scope > .db-panel")];
+        const movePeers = groupPeers(panel, "panel")
+          .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
+          .sort((a, b) => startPanels.indexOf(a) - startPanels.indexOf(b));
         const startIndex = startPanels.indexOf(panel);
         const pinnedBefore = startPanels
           .slice(0, Math.max(0, startIndex))
@@ -1565,6 +1661,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const isInsidePinnedSegment = (item) => {
           if (!item || item === panel) return false;
+          if (movePeers.includes(item)) return false;
           if (item === placeholder) return true;
           if (item.classList.contains("db-panel-pinned")) return false;
           const itemIndex = childIndex(item);
@@ -1730,6 +1827,12 @@ document.addEventListener("DOMContentLoaded", () => {
             panel.style.top = "";
             panel.style.width = "";
             layout.insertBefore(panel, placeholder);
+            movePeers.forEach((peer) => {
+              if (peer.previousElementSibling?.classList.contains("db-panel-row-break")) {
+                peer.previousElementSibling.remove();
+              }
+              layout.insertBefore(peer, placeholder);
+            });
             placeholder.remove();
             cleanupPanelRowBreaks(layout);
             savePanelLayouts(layout);
@@ -1763,8 +1866,26 @@ document.addEventListener("DOMContentLoaded", () => {
         const layoutWidth = Math.max(1, layoutRect.width);
         const startWidthPct = (startRect.width / layoutWidth) * 100;
         const minWidthPct = Math.min(100, (getPanelMinimumWidth(panel) / layoutWidth) * 100);
+        const startSpan = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12;
+        const resizePeers = groupPeers(panel, "panel")
+          .filter((peer) => !peer.classList.contains("db-panel-pinned") && groupItemLayout(peer) === layout)
+          .map((peer) => ({
+            peer,
+            startSpan: Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 12,
+            startHeight: peer.getBoundingClientRect().height,
+          }));
         let lastAnimatedSpan = Number(panel.dataset.currentSpan) || Number(panel.dataset.defaultSpan) || 12;
         let lastAnimatedHeight = startRect.height;
+        const applyResize = (nextSpan, nextHeight) => {
+          const spanDelta = nextSpan - startSpan;
+          const heightDelta = nextHeight - startRect.height;
+          applyPanelSpan(panel, nextSpan);
+          applyPanelHeight(panel, nextHeight);
+          resizePeers.forEach(({ peer, startSpan: peerStartSpan, startHeight }) => {
+            applyPanelSpan(peer, peerStartSpan + spanDelta);
+            applyPanelHeight(peer, Math.max(getPanelMinimumHeight(peer), Math.round(startHeight + heightDelta)));
+          });
+        };
 
         const onResizeMove = (moveEvent) => {
           const nextWidthPct = Math.max(minWidthPct, Math.min(100, startWidthPct + (((moveEvent.clientX - startX) / layoutWidth) * 100)));
@@ -1776,21 +1897,22 @@ document.addEventListener("DOMContentLoaded", () => {
             Math.abs(nextHeight - lastAnimatedHeight) >= 24;
           if (shouldAnimateReflow) {
             animatePanelReflow(layout, () => {
-              applyPanelSpan(panel, normalizedSpan);
-              applyPanelHeight(panel, nextHeight);
+              applyResize(normalizedSpan, nextHeight);
             }, panel);
             lastAnimatedSpan = normalizedSpan;
             lastAnimatedHeight = nextHeight;
           } else {
-            applyPanelSpan(panel, normalizedSpan);
-            applyPanelHeight(panel, nextHeight);
+            applyResize(normalizedSpan, nextHeight);
           }
         };
 
         const onResizeEnd = () => {
           document.body.classList.remove("panel-interaction-active");
           toolPointerCapture = false;
-          animatePanelReflow(layout, () => applyPanelSpan(panel, Math.round(Number(panel.dataset.currentSpan) || lastAnimatedSpan)), panel);
+          animatePanelReflow(layout, () => {
+            applyPanelSpan(panel, Math.round(Number(panel.dataset.currentSpan) || lastAnimatedSpan));
+            resizePeers.forEach(({ peer }) => applyPanelSpan(peer, Math.round(Number(peer.dataset.currentSpan) || Number(peer.dataset.defaultSpan) || 12)));
+          }, panel);
           closePanelTools();
           savePanelLayouts(layout);
           document.removeEventListener("pointermove", onResizeMove);
@@ -2040,6 +2162,54 @@ document.addEventListener("DOMContentLoaded", () => {
       const widgetLayout = document.querySelector(`.widget-layout[data-widget-layout-key="${CSS.escape(layoutKey)}"]`);
       if (widgetLayout) saveWidgetLayouts(widgetLayout, selected, { persist: true });
       showToast(`Layout ${selected} saved.`);
+    });
+  });
+
+  document.querySelectorAll(".layout-group-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      setGroupMode(!groupMode);
+      showToast(groupMode ? "Group selection enabled." : "Group selection cleared.");
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!groupMode || event.button !== 0) return;
+    if (event.target?.closest?.(".app-nav, .panel-tools, .widget-tools, .panel-color-menu, .panel-add-menu, .layout-slot-menu, .nav-status-popover")) return;
+    const item = event.target?.closest?.(".widget-layout > .widget-card, .panel-layout > .db-panel");
+    if (!item) return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleGroupItem(item);
+  }, true);
+
+  document.querySelectorAll(".layout-normalize-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const layoutKey = button.dataset.layoutTarget || "default";
+      const widgets = selectedGroupItems("widget", layoutKey);
+      const panels = selectedGroupItems("panel", layoutKey);
+      if (widgets.length < 2 && panels.length < 2) {
+        showToast("Select at least two widgets or two panels in Group mode first.", "warn");
+        return;
+      }
+      const widgetLayout = document.querySelector(`.widget-layout[data-widget-layout-key="${CSS.escape(layoutKey)}"]`);
+      const panelLayout = document.querySelector(`.panel-layout[data-layout-key="${CSS.escape(layoutKey)}"]`);
+      if (widgets.length > 1 && widgetLayout) {
+        const span = Math.round(Number(widgets[0].dataset.currentSpan) || Number(widgets[0].dataset.defaultSpan) || 3);
+        animateWidgetReflow(widgetLayout, () => widgets.forEach((widget) => applyWidgetSpan(widget, span)));
+        saveWidgetLayouts(widgetLayout);
+      }
+      if (panels.length > 1 && panelLayout) {
+        const span = Math.round(Number(panels[0].dataset.currentSpan) || Number(panels[0].dataset.defaultSpan) || 12);
+        const height = Number(panels[0].dataset.savedHeight) || panels[0].getBoundingClientRect().height;
+        animatePanelReflow(panelLayout, () => {
+          panels.forEach((panel) => {
+            applyPanelSpan(panel, span);
+            applyPanelHeight(panel, height);
+          });
+        });
+        savePanelLayouts(panelLayout);
+      }
+      showToast("Selected group size normalized.");
     });
   });
 

@@ -43,6 +43,8 @@
     </div>
     <button class="panel-reset-button" type="button" data-layout-target="acronis" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
     <button class="panel-undo-button" type="button" data-layout-target="acronis" aria-label="Undo last layout change" title="Undo last layout change">Undo</button>
+    <button class="layout-slot-button layout-group-button" type="button" data-layout-target="acronis" aria-pressed="false" title="Select widgets or panels as a group">Group</button>
+    <button class="layout-slot-button layout-normalize-button" type="button" data-layout-target="acronis" title="Normalize selected group size">Normalize</button>
     <details class="nav-status-menu">
       <summary class="nav-status-item nav-status-icon-only {% if acronis_config.mailbox_address %}nav-status-good{% else %}nav-status-bad{% endif %}" aria-label="{% if acronis_config.mailbox_address %}Mailbox connected: {{ acronis_config.mailbox_address }}{% else %}Mailbox not connected{% endif %}" title="{% if acronis_config.mailbox_address %}Mailbox connected: {{ acronis_config.mailbox_address }}{% else %}Mailbox not connected{% endif %}">
         <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>

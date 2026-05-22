@@ -60,6 +60,8 @@ The dashboard now includes a shared widget and panel layout system across ESET, 
 - Small pinned-state indicator dots on locked panels and widgets
 - Time filters are now a full-width widget with the same layout tools and no-refresh filtering behavior
 - Metric widget clicks update dashboard filters in place without a full browser refresh
+- Group mode in the top bar lets operators select multiple widgets or panels, then move, resize, pin, recolor, delete, or normalize selected items together
+- Normalize control aligns selected widgets or selected panels to the first selected item's size while preserving the existing 12-column layout behavior
 - Dashboard-wide keyword search that behaves like a panel-aware Control-F, filtering visible rows/cards across panels and expanding matching panels
 - Collapsible Analytics, Alerts, and Escalations panels with consistent header controls and count behavior
 - Polished top-bar controls for mailbox status, sync health, theme mode, configuration, disconnect, layout slots, and custom panel/widget actions

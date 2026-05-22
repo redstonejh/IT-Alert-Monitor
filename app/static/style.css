@@ -7791,6 +7791,16 @@ html[data-theme="dark"] .widget-card.db-panel-custom-color .widget-tool-drawer {
   padding: 0 12px;
 }
 
+.app-nav:not(.settings-nav) .layout-group-button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--blue) 62%, var(--line-soft));
+  background: color-mix(in srgb, var(--blue) 12%, var(--surface));
+  color: var(--blue);
+  box-shadow:
+    0 10px 22px rgba(37, 99, 235, .16),
+    0 0 0 2px rgba(37, 99, 235, .12),
+    0 1px 0 rgba(255, 255, 255, .72) inset;
+}
+
 .app-nav:not(.settings-nav) .panel-add-button,
 .app-nav:not(.settings-nav) .nav-status-icon-only,
 .app-nav:not(.settings-nav) .cmd-btn-icon-only {
@@ -7952,6 +7962,40 @@ html[data-theme="dark"] .app-nav:not(.settings-nav) .nav-status-icon-only:hover 
   box-shadow:
     0 12px 24px rgba(0, 0, 0, .28),
     inset 0 1px 0 rgba(255, 255, 255, .075);
+}
+
+html[data-theme="dark"] .app-nav:not(.settings-nav) .layout-group-button[aria-pressed="true"] {
+  border-color: rgba(147, 197, 253, .82);
+  background: color-mix(in srgb, #2563eb 28%, #172235);
+  color: #dbeafe;
+  box-shadow:
+    0 12px 24px rgba(37, 99, 235, .24),
+    0 0 0 2px rgba(147, 197, 253, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+body.group-select-active .widget-layout > .widget-card,
+body.group-select-active .panel-layout > .db-panel {
+  cursor: pointer;
+}
+
+.widget-layout > .widget-card.group-selected,
+.panel-layout > .db-panel.group-selected {
+  outline: 3px solid color-mix(in srgb, var(--panel-accent, var(--blue)) 76%, #ffffff);
+  outline-offset: 4px;
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px rgba(var(--panel-accent-rgb, 37, 99, 235), .2),
+    0 12px 28px rgba(var(--panel-accent-rgb, 37, 99, 235), .18) !important;
+}
+
+html[data-theme="dark"] .widget-layout > .widget-card.group-selected,
+html[data-theme="dark"] .panel-layout > .db-panel.group-selected {
+  outline-color: color-mix(in srgb, var(--panel-accent, #93c5fd) 70%, #dbeafe);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px rgba(var(--panel-accent-rgb, 147, 197, 253), .24),
+    0 14px 30px rgba(var(--panel-accent-rgb, 147, 197, 253), .22) !important;
 }
 
 @media (max-width: 980px) {
