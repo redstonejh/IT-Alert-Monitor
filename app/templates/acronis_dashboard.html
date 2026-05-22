@@ -24,20 +24,55 @@
     </div>
   </div>
   <div class="app-nav-status" aria-label="Connection and sync status">
-    <div class="nav-status-item">
-      <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
-      <span>
-        <strong>{{ acronis_config.mailbox_address or "Not connected" }}</strong>
-        <small>{% if acronis_config.mailbox_address %}Connected mailbox{% else %}Connect a mailbox{% endif %}</small>
-      </span>
+    <div class="layout-slot-controls" aria-label="Layout save slots">
+      <div class="layout-slot-picker" data-layout-target="acronis">
+        <button class="layout-slot-trigger" type="button" data-current-slot="1" aria-haspopup="true" aria-expanded="false">Layout 1</button>
+        <div class="layout-slot-menu" role="menu">
+          {% for slot in range(1, 11) %}<button type="button" role="menuitem" data-slot="{{ slot }}">Layout {{ slot }}</button>{% endfor %}
+        </div>
+      </div>
+      <button class="layout-slot-button layout-save-button" type="button" data-layout-target="acronis">Save</button>
+      <button class="layout-slot-button layout-load-button" type="button" data-layout-target="acronis">Load</button>
     </div>
-    <div class="nav-status-item">
-      <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
-      <span>
-        <strong>{% if last_scan_error %}Sync attention{% elif last_scan_display %}Sync healthy{% else %}Not scanned yet{% endif %}</strong>
-        <small>{% if last_scan_error %}{{ last_scan_error }}{% else %}Last scan {{ last_scan_display or "—" }}{% endif %}</small>
-      </span>
+    <div class="panel-add-picker" data-layout-target="acronis">
+      <button class="panel-add-button" type="button" aria-label="Panel actions" aria-haspopup="true" aria-expanded="false" title="Panel actions">+</button>
+      <div class="panel-add-menu">
+        <button class="panel-add-action" type="button" data-layout-target="acronis">Add panel</button>
+      </div>
     </div>
+    <button class="panel-reset-button" type="button" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
+    <details class="nav-status-menu">
+      <summary class="nav-status-item nav-status-icon-only {% if acronis_config.mailbox_address %}nav-status-good{% else %}nav-status-bad{% endif %}" aria-label="{% if acronis_config.mailbox_address %}Mailbox connected: {{ acronis_config.mailbox_address }}{% else %}Mailbox not connected{% endif %}" title="{% if acronis_config.mailbox_address %}Mailbox connected: {{ acronis_config.mailbox_address }}{% else %}Mailbox not connected{% endif %}">
+        <span class="nav-icon nav-icon-mail" aria-hidden="true"></span>
+      </summary>
+      <div class="nav-status-popover">
+        <strong>Mailbox</strong>
+        <div class="nav-status-connected">
+          <span>{% if acronis_config.mailbox_address %}Connected to{% else %}Not connected{% endif %}</span>
+          <b>{{ acronis_config.mailbox_address or "—" }}</b>
+        </div>
+        <ul class="nav-status-checklist" aria-label="Mailbox setup checklist">
+          <li class="nav-status-check {% if mailbox_checks.tenant_id %}nav-status-check-ok{% else %}nav-status-check-missing{% endif %}"><span class="nav-status-check-icon" aria-hidden="true"></span><span>Tenant ID</span></li>
+          <li class="nav-status-check {% if mailbox_checks.secret_id %}nav-status-check-ok{% else %}nav-status-check-missing{% endif %}"><span class="nav-status-check-icon" aria-hidden="true"></span><span>Secret ID</span></li>
+          <li class="nav-status-check {% if mailbox_checks.client_id %}nav-status-check-ok{% else %}nav-status-check-missing{% endif %}"><span class="nav-status-check-icon" aria-hidden="true"></span><span>Client ID</span></li>
+          <li class="nav-status-check {% if mailbox_checks.teams_webhook %}nav-status-check-ok{% else %}nav-status-check-missing{% endif %}"><span class="nav-status-check-icon" aria-hidden="true"></span><span>Teams webhook</span></li>
+        </ul>
+      </div>
+    </details>
+    <details class="nav-status-menu">
+      <summary class="nav-status-item nav-status-icon-only {% if sync_healthy %}nav-status-good{% else %}nav-status-bad{% endif %}" aria-label="{% if sync_healthy %}Sync healthy{% else %}Sync failed{% endif %}. {% if last_scan_error %}{{ last_scan_error }}{% else %}Last sync {{ last_scan_display or '—' }}{% endif %}" title="{% if sync_healthy %}Sync healthy{% else %}Sync failed{% endif %}. {% if last_scan_error %}{{ last_scan_error }}{% else %}Last sync {{ last_scan_display or '—' }}{% endif %}">
+        <span class="nav-icon nav-icon-sync" aria-hidden="true"></span>
+      </summary>
+      <div class="nav-status-popover">
+        <strong>Sync</strong>
+        <dl>
+          <div><dt>Interval</dt><dd>Every 60 seconds</dd></div>
+          <div><dt>Last sync</dt><dd>{{ last_scan_display or "—" }}</dd></div>
+          <div><dt>Status</dt><dd>{% if sync_healthy %}Healthy{% elif last_scan_error %}Failed{% else %}Failed{% endif %}</dd></div>
+          {% if last_scan_error %}<div><dt>Error</dt><dd>{{ last_scan_error }}</dd></div>{% endif %}
+        </dl>
+      </div>
+    </details>
   </div>
   <div class="app-nav-actions">
     {% if auto_scanned and auto_processed > 0 %}
@@ -51,11 +86,10 @@
       <span class="theme-icon theme-icon-day" aria-hidden="true">☀</span>
       <span class="theme-icon theme-icon-night" aria-hidden="true">☾</span>
     </button>
-    <button class="panel-reset-button" type="button" aria-label="Reset panel layout" title="Reset panel layout">Default</button>
-    <a class="cmd-btn" href="/acronis/settings"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span>Configure</a>
+    <a class="cmd-btn cmd-btn-icon-only" href="/acronis/settings" aria-label="Configure" title="Configure"><span class="btn-icon btn-icon-settings" aria-hidden="true"></span></a>
     {% if acronis_config.mailbox_address %}
     <form method="post" action="/acronis/settings/disconnect">
-      <button class="cmd-btn cmd-btn-danger" type="submit"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span>Disconnect</button>
+      <button class="cmd-btn cmd-btn-danger cmd-btn-icon-only" type="submit" aria-label="Disconnect" title="Disconnect"><span class="btn-icon btn-icon-disconnect" aria-hidden="true"></span></button>
     </form>
     {% endif %}
   </div>
@@ -95,8 +129,8 @@
       <input type="hidden" name="range" value="{{ active_days }}">
     {% endif %}
     {% if active_metric %}<input type="hidden" name="metric" value="{{ active_metric }}">{% endif %}
-    <input class="range-search-input" type="search" name="q" value="{{ search_query }}" placeholder=" " aria-label="Search Acronis alerts">
-    <span class="range-search-label">Search alerts</span>
+    <input class="range-search-input" type="search" name="q" value="{{ search_query }}" placeholder=" " aria-label="Search for keyword">
+    <span class="range-search-label">Search for keyword</span>
     {% if search_query %}
       <a class="range-search-clear" href="/acronis?{{ range_query }}{% if active_metric %}&metric={{ active_metric }}{% endif %}" aria-label="Clear search">Clear</a>
     {% endif %}
@@ -132,7 +166,16 @@
     <div class="db-panel-hd db-panel-hd-alerts">
       <span class="db-panel-title">{{ metric_label }}</span>
       <span class="db-panel-count">{{ acronis_alerts | length }}</span>
-      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
+      <div class="panel-tools">
+        <div class="panel-tool-drawer" aria-label="Panel tools">
+          <button class="panel-tool-button panel-move-handle" type="button" aria-label="Move panel" title="Move panel"><span class="move-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-resize-handle" type="button" aria-label="Resize panel" title="Resize panel"><span class="resize-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-pin-toggle" type="button" aria-label="Pin panel" aria-pressed="false" title="Pin panel"><span class="pin-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-title-handle" type="button" aria-label="Rename panel" title="Rename panel"><span class="text-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-color-toggle" type="button" aria-label="Panel colors" aria-expanded="false" title="Panel colors" data-default-theme="#2563eb"><span class="color-icon" aria-hidden="true"></span></button>
+        </div>
+        <button class="panel-settings-toggle" type="button" aria-label="Panel settings" aria-expanded="false" title="Panel settings"><span class="settings-icon" aria-hidden="true"></span></button>
+      </div>
     </div>
     <div class="db-panel-body">
       <table class="al-table acr-eset-table">
@@ -190,7 +233,16 @@
     <div class="db-panel-hd db-panel-hd-escalations">
       <span class="db-panel-title">Escalations</span>
       <span class="db-panel-count">{{ acronis_escalations | length }}</span>
-      <button class="panel-lock-toggle" type="button" aria-label="Unlock panel movement" aria-pressed="false" title="Unlock panel movement"><span class="lock-icon" aria-hidden="true"></span></button>
+      <div class="panel-tools">
+        <div class="panel-tool-drawer" aria-label="Panel tools">
+          <button class="panel-tool-button panel-move-handle" type="button" aria-label="Move panel" title="Move panel"><span class="move-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-resize-handle" type="button" aria-label="Resize panel" title="Resize panel"><span class="resize-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-pin-toggle" type="button" aria-label="Pin panel" aria-pressed="false" title="Pin panel"><span class="pin-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-title-handle" type="button" aria-label="Rename panel" title="Rename panel"><span class="text-icon" aria-hidden="true"></span></button>
+          <button class="panel-tool-button panel-color-toggle" type="button" aria-label="Panel colors" aria-expanded="false" title="Panel colors" data-default-theme="#dc2626"><span class="color-icon" aria-hidden="true"></span></button>
+        </div>
+        <button class="panel-settings-toggle" type="button" aria-label="Panel settings" aria-expanded="false" title="Panel settings"><span class="settings-icon" aria-hidden="true"></span></button>
+      </div>
     </div>
     <div class="db-panel-body esc-feed {% if acronis_escalations %}esc-timeline{% else %}esc-timeline-empty{% endif %}">
       {% for msg in acronis_escalations %}

@@ -11,6 +11,7 @@ from app.company_abbreviations import abbreviate_company, company_full_name
 from app.storage import (
     get_acronis_alert,
     get_acronis_config,
+    get_config,
     get_setting,
     get_state,
     list_acronis_alerts,
@@ -203,6 +204,16 @@ def _format_datetime(value: object) -> str:
         local = _pacific_fallback(utc)
     hour = local.hour % 12 or 12
     return f"{local:%m/%d/%y} {hour}:{local:%M %p}"
+
+
+def _sync_healthy(value: object, *, failed: bool = False, error: object = "") -> bool:
+    if failed or error or not value:
+        return False
+    try:
+        datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return False
+    return True
 
 
 def _format_date_compact(value: str) -> str:
@@ -710,6 +721,15 @@ def _ensure_acronis_scan_coverage(days: int) -> tuple[bool, int]:
     return scanned, processed
 
 
+def _mailbox_checks(acronis_config) -> dict[str, bool]:
+    return {
+        "tenant_id": bool(acronis_config.tenant_id),
+        "client_id": bool(acronis_config.client_id),
+        "secret_id": bool(get_setting("acronis_client_secret")),
+        "teams_webhook": bool(get_config().teams_webhook_url or get_setting("teams_webhook_url")),
+    }
+
+
 @router.get("/acronis")
 def acronis_dashboard(request: Request):
     acronis_config = get_acronis_config()
@@ -734,8 +754,11 @@ def acronis_dashboard(request: Request):
             auto_scanned, auto_processed = _ensure_acronis_scan_coverage(coverage_days)
         except Exception:
             auto_scan_failed = True
-    last_scan_display = _format_datetime(get_state("acronis_last_scan_time"))
+    last_scan_time = get_state("acronis_last_scan_time")
+    last_scan_display = _format_datetime(last_scan_time)
     last_scan_error = get_state("acronis_last_scan_error")
+    sync_failed = bool(auto_scan_failed or request.query_params.get("scan_failed") or last_scan_error)
+    sync_healthy = _sync_healthy(last_scan_time, failed=sync_failed, error=last_scan_error)
     triage_config = _acronis_triage_config()
     raw_alerts = [
         row for row in list_acronis_alerts(limit=500, start=view_start, end=view_end)
@@ -818,8 +841,11 @@ def acronis_dashboard(request: Request):
         {
             "request": request,
             "acronis_config": acronis_config,
+            "mailbox_checks": _mailbox_checks(acronis_config),
             "last_scan_display": last_scan_display,
             "last_scan_error": last_scan_error,
+            "sync_failed": sync_failed,
+            "sync_healthy": sync_healthy,
             "acronis_stats": stats,
             "acronis_alerts": alerts,
             "acronis_triage_alerts": triage_alerts,

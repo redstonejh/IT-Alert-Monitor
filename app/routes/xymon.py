@@ -6,7 +6,15 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
 from app.company_abbreviations import abbreviate_company
-from app.storage import get_state, get_xymon_alert, get_xymon_config, list_xymon_alerts, xymon_dashboard_stats
+from app.storage import (
+    get_config,
+    get_setting,
+    get_state,
+    get_xymon_alert,
+    get_xymon_config,
+    list_xymon_alerts,
+    xymon_dashboard_stats,
+)
 from app.xymon_scanner import DEFAULT_LOOKBACK_DAYS, run_xymon_scan, run_xymon_scan_range
 
 router = APIRouter()
@@ -57,6 +65,16 @@ def _format_datetime(value: object) -> str:
         local = _pacific_fallback(utc)
     hour = local.hour % 12 or 12
     return f"{local:%m/%d/%y} {hour}:{local:%M %p}"
+
+
+def _sync_healthy(value: object, *, failed: bool = False, error: object = "") -> bool:
+    if failed or error or not value:
+        return False
+    try:
+        datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return False
+    return True
 
 
 def _format_date_compact(value: str) -> str:
@@ -154,6 +172,15 @@ def _ensure_xymon_scan_coverage(days: int) -> tuple[bool, int]:
     return scanned, processed
 
 
+def _mailbox_checks(xymon_config) -> dict[str, bool]:
+    return {
+        "tenant_id": bool(xymon_config.tenant_id),
+        "client_id": bool(xymon_config.client_id),
+        "secret_id": bool(get_setting("xymon_client_secret")),
+        "teams_webhook": bool(get_config().teams_webhook_url or get_setting("teams_webhook_url")),
+    }
+
+
 @router.get("/xymon")
 @router.get("/xymon/")
 def xymon_dashboard(request: Request):
@@ -179,8 +206,11 @@ def xymon_dashboard(request: Request):
             auto_scanned, auto_processed = _ensure_xymon_scan_coverage(coverage_days)
         except Exception:
             auto_scan_failed = True
-    last_scan_display = _format_datetime(get_state("xymon_last_scan_time"))
+    last_scan_time = get_state("xymon_last_scan_time")
+    last_scan_display = _format_datetime(last_scan_time)
     last_scan_error = get_state("xymon_last_scan_error")
+    sync_failed = bool(auto_scan_failed or request.query_params.get("scan_failed") or last_scan_error)
+    sync_healthy = _sync_healthy(last_scan_time, failed=sync_failed, error=last_scan_error)
     stats = xymon_dashboard_stats(start=view_start, end=view_end)
     raw_alerts = list_xymon_alerts(limit=200, start=view_start, end=view_end, status=active_metric)
     alerts = []
@@ -210,8 +240,11 @@ def xymon_dashboard(request: Request):
         {
             "request": request,
             "xymon_config": xymon_config,
+            "mailbox_checks": _mailbox_checks(xymon_config),
             "last_scan_display": last_scan_display,
             "last_scan_error": last_scan_error,
+            "sync_failed": sync_failed,
+            "sync_healthy": sync_healthy,
             "xymon_stats": stats,
             "xymon_alerts": alerts,
             "active_days": active_days,

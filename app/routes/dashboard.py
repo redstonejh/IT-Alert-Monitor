@@ -14,6 +14,7 @@ from app.scanner import DEFAULT_LOOKBACK_DAYS, run_scan, run_scan_range
 from app.storage import (
     dashboard_stats,
     get_config,
+    get_setting,
     get_state,
     list_alerts,
     list_current_escalation_cases,
@@ -264,6 +265,16 @@ def _format_datetime(value: object) -> str:
     return f"{local:%m/%d/%y} {hour}:{local:%M %p}"
 
 
+def _sync_healthy(value: object, *, failed: bool = False) -> bool:
+    if failed or not value:
+        return False
+    try:
+        datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return False
+    return True
+
+
 def _today_utc() -> datetime:
     return datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -450,6 +461,16 @@ def _dashboard_visuals(alerts: list[dict], start: str, end: str) -> dict:
     }
 
 
+def _mailbox_checks(config: dict) -> dict[str, bool]:
+    secure_config = get_config(include_secrets=True)
+    return {
+        "tenant_id": bool(config.get("tenant_id")),
+        "client_id": bool(config.get("client_id")),
+        "secret_id": bool(secure_config.client_secret or get_setting("client_secret")),
+        "teams_webhook": bool(secure_config.teams_webhook_url or get_setting("teams_webhook_url")),
+    }
+
+
 @router.get("/")
 @router.get("/dashboard")
 def dashboard(request: Request):
@@ -483,6 +504,8 @@ def dashboard(request: Request):
 
     stats = dashboard_stats(start=view_start, end=view_end)
     stats["last_scan_display"] = _format_datetime(stats.get("last_scan_time"))
+    sync_failed = bool(auto_scan_failed or request.query_params.get("scan_failed"))
+    sync_healthy = _sync_healthy(stats.get("last_scan_time"), failed=sync_failed)
     stats["scan_range_display"] = active_label
     stats["coverage_start_display"] = _format_date_short(get_state("scan_coverage_start"))
     stats["coverage_end_display"] = _format_date_short(get_state("scan_coverage_end"))
@@ -543,6 +566,7 @@ def dashboard(request: Request):
         {
             "request": request,
             "config": config,
+            "mailbox_checks": _mailbox_checks(config),
             "stats": stats,
             "redirect_uri": local_redirect_uri(request),
             "recent_alerts": recent_alerts,
@@ -564,5 +588,7 @@ def dashboard(request: Request):
             "auto_scanned": auto_scanned,
             "auto_processed": auto_processed,
             "auto_scan_failed": auto_scan_failed,
+            "sync_failed": sync_failed,
+            "sync_healthy": sync_healthy,
         },
     )
