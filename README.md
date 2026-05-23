@@ -53,15 +53,16 @@ The dashboard now includes a shared widget and panel layout system across ESET, 
 - Live `+` panel and widget creation without refreshing the page or resetting the current layout
 - Movable, resizable, pinnable, renameable, recolorable, and deletable dashboard widgets
 - Movable, resizable, pinnable, renameable, recolorable, and deletable dashboard panels
-- Smooth resize and drag interactions, with widgets and panels snapping back to equal 12-column spacing intervals when released
+- Smooth resize and drag interactions, with widgets and panels snapping to a shared 6-tile invisible grid when released
+- Ghost placement previews during drag and resize, with colliding items animated to nearby valid grid positions
+- Newly added panels start collapsed, and collapsed panels reserve only one grid row during layout movement
 - Layout save/load slots for preserving different dashboard arrangements
 - A Default control that resets only the current dashboard and active layout profile
 - Draft-only layout edits until Save is clicked, with Undo support for recent layout changes
 - Small pinned-state indicator dots on locked panels and widgets
 - Time filters are now a full-width widget with the same layout tools and no-refresh filtering behavior
 - Metric widget clicks update dashboard filters in place without a full browser refresh
-- Group mode in the top bar lets operators select multiple widgets or panels, then move, resize, pin, recolor, delete, or normalize selected items together
-- Normalize control aligns selected widgets or selected panels to the first selected item's size while preserving the existing 12-column layout behavior
+- Group mode in the top bar lets operators select multiple widgets or panels, then move, resize, pin, recolor, or delete selected items together
 - Dashboard-wide keyword search that behaves like a panel-aware Control-F, filtering visible rows/cards across panels and expanding matching panels
 - Collapsible Analytics, Alerts, and Escalations panels with consistent header controls and count behavior
 - Polished top-bar controls for mailbox status, sync health, theme mode, configuration, disconnect, layout slots, and custom panel/widget actions
